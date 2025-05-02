@@ -1,10 +1,8 @@
 import path from 'path';
 import axios from 'axios';
-import { Document } from '@llamaindex/core';
 import { SimpleDirectoryReader } from '@llamaindex/readers/directory';
-import { VectorStoreIndex } from '@llamaindex/core';
-import { FunctionTool } from '@llamaindex/core/tools/function';
-import { ChatEngine } from '@llamaindex/core/chat_engine';
+import { FunctionTool } from '@llamaindex/core/tools';
+import { VectorStoreIndex } from 'llamaindex';
 
 const FATCAT_MINT = 'AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -25,7 +23,7 @@ async function fetchTokenPrice(symbol: string, mint: string): Promise<number> {
     return price;
   }
 
-  const amount = 1_000_000; // 1 token in base units
+  const amount = 1_000_000;
   const res = await axios.get(
     `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${SOL_MINT}&amount=${amount}`
   );
@@ -36,23 +34,27 @@ async function fetchTokenPrice(symbol: string, mint: string): Promise<number> {
   return price;
 }
 
-const getSolPriceTool = FunctionTool.fromDefaults({
-  name: 'get_sol_price',
-  description: 'Returns the current price of SOL in USD.',
-  fn: async () => {
+const getSolPriceTool = new FunctionTool(
+  async () => {
     const price = await fetchTokenPrice('SOL', SOL_MINT);
     return `1 SOL = $${price.toFixed(4)}`;
+  },
+  {
+    name: 'get_sol_price',
+    description: 'Returns the current price of SOL in USD.',
   }
-});
+);
 
-const getFatcatPriceTool = FunctionTool.fromDefaults({
-  name: 'get_fatcat_price',
-  description: 'Returns the current price of $FATCAT in USD.',
-  fn: async () => {
+const getFatcatPriceTool = new FunctionTool(
+  async () => {
     const price = await fetchTokenPrice('FATCAT', FATCAT_MINT);
     return `1 $FATCAT = $${price.toFixed(6)}`;
+  },
+  {
+    name: 'get_fatcat_price',
+    description: 'Returns the current price of $FATCAT in USD.',
   }
-});
+);
 
 let queryEngine2: any;
 export const getQueryEngine2 = () => queryEngine2;
@@ -65,17 +67,14 @@ export const createQueryEngine2 = async () => {
     const sol = await fetchTokenPrice('SOL', SOL_MINT);
     const fatcat = await fetchTokenPrice('FATCAT', FATCAT_MINT);
 
-    const priceDoc = new Document({
-      text: `\n📈 Real-time Token Prices:\n\n• 1 SOL = $${sol.toFixed(4)}\n• 1 $FATCAT = $${fatcat.toFixed(6)}\n\nPrices auto-refresh every 5 minutes.`,
-      metadata: { type: 'price' },
-    });
 
-    const allDocs = [...localDocs, priceDoc];
+    const allDocs = [...localDocs];
     const index = await VectorStoreIndex.fromDocuments(allDocs);
 
-    queryEngine2 = await ChatEngine.fromDefaults({
-      index,
-      tools: [getSolPriceTool, getFatcatPriceTool]
+    queryEngine2 = new FunctionCallingAgent({
+      tools: [getSolPriceTool, getFatcatPriceTool],
+      llm: undefined, // your OpenAI config or LLM instance here if needed
+      retriever: index.asRetriever(),
     });
 
     console.log(`✅ Query Engine 2 initialized with ${allDocs.length} documents.`);

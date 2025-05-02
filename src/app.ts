@@ -5,9 +5,9 @@ import cors from "cors";
 import helmet from "helmet";
 import { sanitize } from "isomorphic-dompurify";
 import rateLimit from "express-rate-limit";
-import corsConfig from "./config/cors";
-import aiRoutes from "./routes/aiRoutes";
 import { OpenAI } from "openai";
+import corsConfig from "./config/cors.js";
+import aiRoutes from "./routes/aiRoutes.js";
 
 const app = express();
 
@@ -64,6 +64,4 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
 
 export default app;
 
-);
 
-export default app;

@@ -9,17 +9,22 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@llamaindex/core": "^0.10.3",
-    "@llamaindex/readers": "^2.0.8",
-    "axios": "^1.6.7",
-    "openai": "^4.30.0",
-    "express": "^4.19.2",
-    "dotenv": "^16.4.7"
+    "axios": "^1.9.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv-flow": "^4.1.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.1.0",
+    "isomorphic-dompurify": "^2.24.0",
+    "llamaindex": "^0.10.3",
+    "openai": "^4.97.0"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }
-
-
