@@ -8,7 +8,7 @@ import rateLimit from "express-rate-limit";
 import { init } from "./db/dbConncetion";
 import { logger } from "./sockets/logger";
 import corsConfig from "./config/cors";
-import aiRoutes, { aiResponse } from "./routes/aiRoutes"
+import aiRoutes from "./routes/aiRoutes"
 import { OpenAI } from 'openai'
 
 
