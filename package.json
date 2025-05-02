@@ -2,18 +2,23 @@
   "name": "llamaindex-query-engine",
   "version": "1.0.0",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "dev": "ts-node src/queryEngine2.ts",
-    "build": "tsc"
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@llamaindex/core": "^0.10.3",
     "@llamaindex/readers": "^2.0.8",
-    "axios": "^1.6.7"
+    "axios": "^1.6.7",
+    "express": "^4.19.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2"
   }
 }
+
