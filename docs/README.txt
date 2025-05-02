@@ -1,0 +1,1 @@
+This is a sample document used for testing LlamaIndex.
