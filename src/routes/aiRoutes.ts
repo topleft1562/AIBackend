@@ -1,9 +1,9 @@
 import express from 'express';
-import { getQueryEngine2 } from '../utils/queryEngine2';
+import { getQueryEngine2 } from '../utils/queryEngine.js';
 
 const router = express.Router();
 
-router.post('/response', async (req, res) => {
+router.post('/response', async (req: any, res: any) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'Missing message' });

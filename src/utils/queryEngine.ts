@@ -1,8 +1,8 @@
 import path from 'path';
 import axios from 'axios';
-import { SimpleDirectoryReader } from '@llamaindex/readers/directory';
 import { FunctionTool } from '@llamaindex/core/tools';
 import { VectorStoreIndex } from 'llamaindex';
+import { SimpleDirectoryReader } from '@llamaindex/readers/directory';
 
 const FATCAT_MINT = 'AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -71,11 +71,7 @@ export const createQueryEngine2 = async () => {
     const allDocs = [...localDocs];
     const index = await VectorStoreIndex.fromDocuments(allDocs);
 
-    queryEngine2 = new FunctionCallingAgent({
-      tools: [getSolPriceTool, getFatcatPriceTool],
-      llm: undefined, // your OpenAI config or LLM instance here if needed
-      retriever: index.asRetriever(),
-    });
+    queryEngine2 = index.asQueryEngine();
 
     console.log(`✅ Query Engine 2 initialized with ${allDocs.length} documents.`);
   } catch (err) {
