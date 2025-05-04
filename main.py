@@ -21,12 +21,16 @@ def chat():
 
     if not message:
         return jsonify({"error": "Missing message"}), 400
+    
+    # Build message with metadata context
+    full_message = f"""{message}
 
+        [groupId: {group_id}]
+        [telegramId: {telegram_id}]
+        """
+   
     try:
-        response = agent.chat(
-            message,
-            tools_metadata={"groupId": group_id, "telegramId": telegram_id}
-        )
+        response = agent.chat(full_message)
         return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
