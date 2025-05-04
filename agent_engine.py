@@ -20,7 +20,6 @@ llm = OpenAI(model="gpt-3.5-turbo")
 def get_agent_runner():
     docs = SimpleDirectoryReader("docs2").load_data()
     index = VectorStoreIndex.from_documents(docs)
-
     tools = [
         FunctionTool.from_defaults(
             fn=fetch_sol_price,
@@ -40,7 +39,7 @@ def get_agent_runner():
         QueryEngineTool.from_defaults(
             query_engine=index.as_query_engine(),
             name="project_docs",
-            description="Query token/project documentation"
+            description="General queries about you, developers and the FATCAT project."
         ),
         FunctionTool.from_defaults(
             fn=lambda telegram_id: get_user_by_telegram_id(int(telegram_id)),
