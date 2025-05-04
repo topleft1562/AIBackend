@@ -1,3 +1,4 @@
+import json
 import requests, time
 
 CACHE = {}
@@ -10,47 +11,14 @@ def add_token_entry(key, entry):
     TOKEN_MAP[key].append(entry)
 
 def load_token_list():
-    print("🔄 Loading Raydium token list...")
-
-    TOKEN_MAP["$FATCAT"] = {
-        "address": "AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump",
-        "decimals": 6
-    }
-
-    url = "https://api.raydium.io/v2/sdk/token/raydium.mainnet.json"
+    print("📂 Loading cached token list...")
     try:
-        res = requests.get(url, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-
-        tokens = (
-            data.get("official", []) +
-            data.get("unOfficial", []) +
-            data.get("unNamed", [])
-        )
-
-        for token in tokens:
-            symbol = token.get("symbol")
-            name = token.get("name")
-            if not symbol or not name:
-                continue  # Skip anonymous tokens
-
-            symbol = symbol.upper()
-            name = name.lower()
-            address = token["mint"]
-            decimals = token["decimals"]
-
-            # Optional: skip tokens missing critical info
-            if not address or decimals is None:
-                continue
-
-            TOKEN_MAP[symbol] = {"address": address, "decimals": decimals}
-            TOKEN_MAP[name] = {"address": address, "decimals": decimals}
-
+        with open("cached_tokens.json", "r") as f:
+            data = json.load(f)
+            TOKEN_MAP.update(data)
         print(f"✅ Loaded {len(TOKEN_MAP)} tokens into cache")
-
     except Exception as e:
-        print(f"❌ Failed to fetch token list: {e}")
+        print(f"❌ Failed to load token list: {e}")
 
 
 def get_price_cached(symbol, fetch_fn):
