@@ -30,7 +30,12 @@ def get_agent_runner():
         FunctionTool.from_defaults(
             fn=get_token_price,
             name="price_of_a_token",
-            description="Query current price of a given token"
+            description="Query current price of any token by symbol or contract address"
+        ),
+        FunctionTool.from_defaults(
+            fn=get_token_address,
+            name="get_token_address",
+            description="Get the token contract address and decimals for a given token"
         ),
         QueryEngineTool.from_defaults(
             query_engine=index.as_query_engine(),
@@ -61,11 +66,6 @@ def get_agent_runner():
             fn=lambda group_id: get_leaderboard(int(group_id)),
             name="get_leaderboard",
             description="Get the top 10 users in a Telegram group based on groupPoints"
-        ),
-        FunctionTool.from_defaults(
-            fn=get_token_address,
-            name="get_token_address",
-            description="Look up the contract address and decimals of a token by name or symbol"
         ),
     ]
 

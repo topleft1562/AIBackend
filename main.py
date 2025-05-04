@@ -6,9 +6,6 @@ from tools.token_tools import load_token_list
 
 app = Flask(__name__)
 
-# Start token loading in background (non-blocking for Railway)
-threading.Thread(target=load_token_list, daemon=True).start()
-
 # Initialize FatCat agent
 agent = get_agent_runner()
 
