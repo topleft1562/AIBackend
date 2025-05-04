@@ -30,8 +30,8 @@ def chat():
         return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+    
 if __name__ == "__main__":
-    # Use Railway's injected PORT env var or default to 5000 locally
-    port = int(os.environ.get("PORT", 5000))
+    import os
+    port = int(os.environ.get("PORT", 5000))  # Railway will provide this
     app.run(host="0.0.0.0", port=port)
