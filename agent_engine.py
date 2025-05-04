@@ -28,12 +28,12 @@ def get_agent_runner():
             description="Query current price of SOL (Solana)"
         ),
         FunctionTool.from_defaults(
-            fn=get_token_price,
+            fn=lambda token: get_token_price(str(token)),
             name="price_of_a_token",
             description="Query current price of any token by symbol or contract address"
         ),
         FunctionTool.from_defaults(
-            fn=get_token_address,
+            fn=lambda token: get_token_address(str(token)),
             name="get_token_address",
             description="Get the token contract address and decimals for a given token"
         ),
