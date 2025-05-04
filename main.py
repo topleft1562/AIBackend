@@ -1,10 +1,16 @@
+import os
+import threading
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
 from tools.token_tools import load_token_list
 
 app = Flask(__name__)
+
+# Start token loading in background (non-blocking for Railway)
+threading.Thread(target=load_token_list, daemon=True).start()
+
+# Initialize FatCat agent
 agent = get_agent_runner()
-load_token_list()
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -21,10 +27,11 @@ def chat():
             message,
             tools_metadata={"groupId": group_id, "telegramId": telegram_id}
         )
-        return jsonify({ "reply": response.response })  # .response for FunctionCallingAgent result
+        return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Use Railway's injected PORT env var or default to 5000 locally
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
