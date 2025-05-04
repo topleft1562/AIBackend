@@ -10,39 +10,48 @@ def add_token_entry(key, entry):
     TOKEN_MAP[key].append(entry)
 
 def load_token_list():
-    print("\U0001F504 Loading Raydium token list...")
+    print("🔄 Loading Raydium token list...")
 
-    add_token_entry("$FATCAT", {
+    TOKEN_MAP["$FATCAT"] = {
         "address": "AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump",
         "decimals": 6
-    })
+    }
 
     url = "https://api.raydium.io/v2/sdk/token/raydium.mainnet.json"
-    res = requests.get(url)
-
-    if res.status_code == 200:
+    try:
+        res = requests.get(url, timeout=10)
+        res.raise_for_status()
         data = res.json()
-        tokens = data.get("official", []) + data.get("unOfficial", []) + data.get("unNamed", [])
 
-        print(f"\U0001F4E6 Found {len(tokens)} total token entries.")
+        tokens = (
+            data.get("official", []) +
+            data.get("unOfficial", []) +
+            data.get("unNamed", [])
+        )
 
         for token in tokens:
-            symbol = token.get("symbol", "").upper()
-            name = token.get("name", "").lower()
-            address = token.get("mint")
-            decimals = token.get("decimals")
+            symbol = token.get("symbol")
+            name = token.get("name")
+            if not symbol or not name:
+                continue  # Skip anonymous tokens
 
+            symbol = symbol.upper()
+            name = name.lower()
+            address = token["mint"]
+            decimals = token["decimals"]
+
+            # Optional: skip tokens missing critical info
             if not address or decimals is None:
                 continue
 
-            if symbol:
-                add_token_entry(symbol, {"address": address, "decimals": decimals})
-            if name:
-                add_token_entry(name, {"address": address, "decimals": decimals})
+            TOKEN_MAP[symbol] = {"address": address, "decimals": decimals}
+            TOKEN_MAP[name] = {"address": address, "decimals": decimals}
 
-        print(f"✅ Loaded {len(TOKEN_MAP)} unique symbols/names into cache (with duplicates tracked)")
-    else:
-        print("❌ Failed to fetch token list")
+        print(f"✅ Loaded {len(TOKEN_MAP)} tokens into cache")
+
+    except Exception as e:
+        print(f"❌ Failed to fetch token list: {e}")
+
 
 def get_price_cached(symbol, fetch_fn):
     now = time.time()
