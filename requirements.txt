@@ -1,0 +1,8 @@
+
+llama-index==0.12.34
+openai>=1.0.0
+pymongo>=4.5.0
+flask>=2.2.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+setuptools>=65.5.0
