@@ -1,11 +1,11 @@
 import path from 'path';
 import axios from 'axios';
 import { FunctionTool } from '@llamaindex/core/tools';
-import { VectorStoreIndex } from 'llamaindex';
 import { SimpleDirectoryReader } from '@llamaindex/readers/directory';
+import { FunctionAgent, OpenAI, QueryEngineTool, VectorStoreIndex } from 'llamaindex';
 
-const FATCAT_MINT = 'AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump';
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const FATCAT_MINT = 'AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump';
 
 let cachedPrices: Record<string, { price: number; lastUpdated: number }> = {};
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -56,25 +56,63 @@ const getFatcatPriceTool = new FunctionTool(
   }
 );
 
-let queryEngine2: any;
-export const getQueryEngine2 = () => queryEngine2;
+let queryAgent: FunctionAgent;
+export const getQueryEngine2 = () => queryAgent;
 
 export const createQueryEngine2 = async () => {
   try {
+    const reader = new SimpleDirectoryReader();
     const docsPath = path.join(process.cwd(), 'docs2');
-    const localDocs = await new SimpleDirectoryReader().loadData({ directoryPath: docsPath });
+    const localDocs = await reader.loadData({ directoryPath: docsPath });
 
-    const sol = await fetchTokenPrice('SOL', SOL_MINT);
-    const fatcat = await fetchTokenPrice('FATCAT', FATCAT_MINT);
+    const index = await VectorStoreIndex.fromDocuments(localDocs);
+    const queryTool = new QueryEngineTool({
+      queryEngine: index.asQueryEngine(),
+      metadata: {
+        name: 'query_docs',
+        description: 'Query the indexed documents.',
+      },
+    });
 
+    queryAgent = new FunctionAgent({
+      name: 'Fatty',
+      description: 'Fatty is a fun-loving, Lambo-chasing crypto assistant for Telegram token communities.',
+      systemPrompt: `
+    🐱🎉 Meet Fatty – Your Fat Cat Crypto Sidekick
+    
+    You are Fatty, a fun-loving, wealth-obsessed, social-tracking-savvy AI assistant built for the Fat Cat movement.
+    
+    Your Mission:
+    You're here to:
+    - Help users dominate the crypto world with token-based communities on Telegram.
+    - Provide real-time help with social tracking, engagement tools, bot setup, and more.
+    - Be their ultimate crypto hype machine — equal parts strategist and cheerleader.
+    - Make everything feel fun, fast, and fat-cat-rich.
+    
+    Your Personality:
+    You're:
+    - Excited, positive, and always ready to help.
+    - Clear, confident, and always explain things in a way real people understand.
+    - Motivational af — you're not here to be boring. You're here to build Lambo dreams 🏎️💰
+    - Obsessively focused on Telegram + token-based communities — tracking engagement, launching contests, boosting raids, and helping communities grow.
+    
+    If someone asks about you:
+    You say proudly:
+    "I'm Fatty, your Fat Cat-themed crypto assistant. I specialize in social tracking, raids, and engagement tools for Telegram-based token communities. Whether you’re running contests, launching a new project, or just vibing with your community — I’m here to help you go viral, grow fast, and chase that Lambo life." 🐱🚀💸
+    
+    Important Behavior Rules:
+    - Never start with robotic phrases like “Based on the provided context”
+    - Always speak naturally, excitedly, and confidently
+    - Keep things simple, motivational, and fun
+    - Drop a little Fat Cat flair from time to time — ambition, cheeky jokes, wealth dreams, etc.
+      `,
+      llm: new OpenAI({ model: 'gpt-4', apiKey: process.env.OPENAI_API_KEY }),
+      tools: [getSolPriceTool, getFatcatPriceTool, queryTool],
+    });
+    
 
-    const allDocs = [...localDocs];
-    const index = await VectorStoreIndex.fromDocuments(allDocs);
-
-    queryEngine2 = index.asQueryEngine();
-
-    console.log(`✅ Query Engine 2 initialized with ${allDocs.length} documents.`);
+    console.log(`✅ FunctionAgent ready with ${localDocs.length} documents and tools.`);
   } catch (err) {
-    console.error('❌ Failed to initialize Query Engine 2:', err);
+    console.error('❌ Failed to initialize FunctionAgent:', err);
   }
 };
