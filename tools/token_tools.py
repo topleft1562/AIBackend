@@ -1,3 +1,4 @@
+import gzip
 import json
 import requests, time
 
@@ -13,7 +14,7 @@ def add_token_entry(key, entry):
 def load_token_list():
     print("📂 Loading cached token list...")
     try:
-        with open("cached_tokens.json", "r") as f:
+        with gzip.open("cached_tokens.json.gz", "rt", encoding="utf-8") as f:
             data = json.load(f)
             TOKEN_MAP.update(data)
         print(f"✅ Loaded {len(TOKEN_MAP)} tokens into cache")
@@ -77,4 +78,22 @@ def get_token_price(token: str) -> str:
     else:
         return f"❌ No valid prices found for '{token}'"
 
+def get_token_address(token: str) -> str:
+    token_upper = token.upper()
+    token_lower = token.lower()
+
+    matches = TOKEN_MAP.get(token_upper) or TOKEN_MAP.get(token_lower)
+    if not matches:
+        return f"❌ Token '{token}' not found."
+
+    if not isinstance(matches, list):
+        matches = [matches]
+
+    results = []
+    for entry in matches:
+        address = entry["address"]
+        decimals = entry["decimals"]
+        results.append(f"🔹 Address: {address} (decimals: {decimals})")
+
+    return "\n".join(results)
 

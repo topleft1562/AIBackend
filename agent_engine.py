@@ -5,7 +5,7 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
-from tools.token_tools import fetch_sol_price, get_token_price
+from tools.token_tools import fetch_sol_price, get_token_price, get_token_address
 from tools.mongo_tools import (
     get_user_by_telegram_id,
     get_group_subscription,
@@ -29,8 +29,8 @@ def get_agent_runner():
         ),
         FunctionTool.from_defaults(
             fn=get_token_price,
-            name="price_of_fatcat",
-            description="Query current price of $FATCAT"
+            name="price_of_a_token",
+            description="Query current price of a given token"
         ),
         QueryEngineTool.from_defaults(
             query_engine=index.as_query_engine(),
@@ -61,6 +61,11 @@ def get_agent_runner():
             fn=lambda group_id: get_leaderboard(int(group_id)),
             name="get_leaderboard",
             description="Get the top 10 users in a Telegram group based on groupPoints"
+        ),
+        FunctionTool.from_defaults(
+            fn=get_token_address,
+            name="get_token_address",
+            description="Look up the contract address and decimals of a token by name or symbol"
         ),
     ]
 
