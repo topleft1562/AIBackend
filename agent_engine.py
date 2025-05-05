@@ -75,34 +75,42 @@ def get_agent_runner():
             fn=query_users,
             name="query_all_users",
             description=(
-                "Query the users database.\nEach user has: telegramId (int), username (str), displayName (str), wallets (dict), "
-                "groupPoints (by groupId: points, invites, messageCount, raids), referralLink (str)."
+                "Query the users collection. Supports pagination with `page` and `limit`.\n"
+                "Each user includes: telegramId (int), username (str), displayName (str), wallets (dict of 'solana' and/or 'evm'), "
+                "groupPoints (dict indexed by groupId: { points, invites, messageCount, raids }), and referralLink (str).\n"
+                "Example usage: query_all_users(page=1, limit=50)"
             )
         ),
         FunctionTool.from_defaults(
             fn=query_projects,
             name="query_all_projects",
             description=(
-                "Query the projects database.\nEach project has: name (str), displayName (str), groupId (int), telegramId (str), "
-                "inviteLink (str), stats (totalPoints, memberCount)."
+                "Query the projects collection. Supports pagination with `page` and `limit`.\n"
+                "Each project includes: name (str), displayName (str), groupId (int), telegramId (str), inviteLink (str), "
+                "stats (totalPoints, memberCount).\n"
+                "Example usage: query_all_projects(page=1, limit=50)"
             )
         ),
         FunctionTool.from_defaults(
             fn=query_raids,
             name="query_all_raids",
             description=(
-                "Query the raids database.\nEach raid has: groupId (int), tweetUrl (str), tweetContent (text, author), "
-                "createdAt, duration (seconds), requiredActions (bools), statistics (counts), status ('in_progress' or 'completed')."
+                "Query the raids collection. Supports pagination with `page` and `limit`.\n"
+                "Each raid includes: groupId (int), tweetUrl (str), tweetContent (text + author), createdAt (datetime), "
+                "duration (seconds), requiredActions (like/retweet/reply/bookmark as bools), statistics (counts), and status ('in_progress' or 'completed').\n"
+                "Example usage: query_all_raids(page=1, limit=50)"
             )
         ),
         FunctionTool.from_defaults(
             fn=query_group_subs,
             name="query_all_group_subs",
             description=(
-                "Query the group subscription database.\nEach entry has: groupId (int), tier (str), subscribedAt (datetime), "
-                "renewalDate (datetime)."
+                "Query the group_subs collection. Supports pagination with `page` and `limit`.\n"
+                "Each entry includes: groupId (int), tier (str), subscribedAt (datetime), and renewalDate (datetime).\n"
+                "Example usage: query_all_group_subs(page=1, limit=50)"
             )
-        ),
+        )
+
     ]
 
     return FunctionCallingAgent.from_tools(

@@ -22,15 +22,23 @@ def get_project_by_group_id(group_id: int) -> str:
     return str(project) if project else "No project found for that group ID."
 
 
-# ✅ Paginated queries
-def query_users(limit: int = 100, skip: int = 0):
+# ✅ Paginated User Query
+def query_users(page: int = 1, limit: int = 100):
+    skip = (page - 1) * limit
     return list(users.find().skip(skip).limit(limit))
 
-def query_projects(limit: int = 100, skip: int = 0):
+# ✅ Paginated Project Query
+def query_projects(page: int = 1, limit: int = 100):
+    skip = (page - 1) * limit
     return list(projects.find().skip(skip).limit(limit))
 
-def query_raids(limit: int = 100, skip: int = 0):
+# ✅ Paginated Raid Query
+def query_raids(page: int = 1, limit: int = 100):
+    skip = (page - 1) * limit
     return list(raids.find().skip(skip).limit(limit))
 
-def query_group_subs(limit: int = 100, skip: int = 0):
+# ✅ Paginated Group Subscription Query
+def query_group_subs(page: int = 1, limit: int = 100):
+    skip = (page - 1) * limit
     return list(group_subs.find().skip(skip).limit(limit))
+
