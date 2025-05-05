@@ -1,155 +1,121 @@
-import json
 import requests
 import time
 
 CACHE = {}
-TTL = 5 * 60  # Cache TTL: 5 minutes
+TTL = 5 * 60  # Cache token prices for 5 minutes
 
-# Dynamic token mappings
-TOKEN_MAP = {}
-ADDRESS_MAP = {}  # mint address -> { symbol, decimals }
+TOKEN_REGISTRY = {}  # symbol → { address, decimals }
+ADDRESS_REGISTRY = {}  # address → { symbol, decimals }
 
-FATCAT_ENTRY = {
-    "address": "AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump",
-    "decimals": 6
-}
-
-def add_symbol_variants(symbol: str, entry: dict):
-    """Add multiple variations of the token symbol to TOKEN_MAP."""
-    variants = {
-        symbol.upper(),
-        symbol.lower(),
-        symbol.upper().lstrip("$"),
-        symbol.lower().lstrip("$"),
-        f"${symbol.upper().lstrip('$')}"
-    }
-    for variant in variants:
-        if variant not in TOKEN_MAP:
-            TOKEN_MAP[variant] = []
-        if entry not in TOKEN_MAP[variant]:
-            TOKEN_MAP[variant].append(entry)
-
-
-# Add FATCAT by default
-add_symbol_variants("$FATCAT", FATCAT_ENTRY)
-
-# Add direct mint-to-symbol entry to ADDRESS_MAP
-ADDRESS_MAP[FATCAT_ENTRY["address"]] = {
-    "symbol": "$FATCAT",
-    "decimals": FATCAT_ENTRY["decimals"]
-}
+DEFAULT_TOKENS = [
+    {
+        "symbol": "$FATCAT",
+        "address": "AHdVQs56QpEEkRx6m8yiYYEiqM2sKjQxVd6mGH12pump",
+        "decimals": 6
+    },
+    {
+        "symbol": "$ETH",
+        "address": "7vfCXTtzZ4a6RZwNEXzq4RZpHZYdHkKp4zj3LZ5D9xwz",  # Wormhole WETH
+        "decimals": 8
+    },
+    {
+        "symbol": "$BTC",
+        "address": "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E",  # Wormhole WBTC
+        "decimals": 8
+    },
+    {
+        "symbol": "$BNB",
+        "address": "9gP2kCy3wA1ctvYWQk75guqXuHfrEomqydHLtcTCqiLa",  # Wormhole WBNB
+        "decimals": 8
+    },
+]
 
 
-def get_price_cached(symbol, fetch_fn):
-    now = time.time()
-    if symbol in CACHE and now - CACHE[symbol]['time'] < TTL:
-        return CACHE[symbol]['value']
-    value = fetch_fn()
-    CACHE[symbol] = {'value': value, 'time': now}
-    return value
+# ---- Initialization ----
+def normalize(symbol: str):
+    base = symbol.strip().upper().lstrip("$")
+    return base, f"${base}"
+
+def register_token(symbol, address, decimals):
+    base, variant = normalize(symbol)
+    entry = {"address": address, "decimals": decimals}
+    TOKEN_REGISTRY[base] = entry
+    TOKEN_REGISTRY[variant] = entry
+    ADDRESS_REGISTRY[address] = {"symbol": variant, "decimals": decimals}
+
+for token in DEFAULT_TOKENS:
+    register_token(token["symbol"], token["address"], token["decimals"])
 
 
+# ---- Price Utilities ----
 def fetch_sol_price():
     res = requests.get("https://api.raydium.io/v2/main/price")
     return res.json().get("So11111111111111111111111111111111111111112", 0)
 
-
-def fetch_token_to_sol_price(input_mint: str, decimals: int):
-    amount = 10 ** decimals
+def fetch_token_to_sol_price(mint: str, decimals: int):
     res = requests.get("https://quote-api.jup.ag/v6/quote", params={
-        "inputMint": input_mint,
+        "inputMint": mint,
         "outputMint": "So11111111111111111111111111111111111111112",
-        "amount": str(amount)
+        "amount": str(10 ** decimals)
     })
     if res.status_code != 200:
         return 0.0
-    data = res.json()
-    return float(data["outAmount"]) / 1e9
+    return float(res.json().get("outAmount", 0)) / 1e9
+
+def get_price_cached(key, fn):
+    now = time.time()
+    if key in CACHE and now - CACHE[key]['time'] < TTL:
+        return CACHE[key]['value']
+    value = fn()
+    CACHE[key] = {"value": value, "time": now}
+    return value
 
 
-def fetch_token_metadata(mint: str):
+# ---- Main Functions ----
+def get_token_price(token: str) -> str:
+    token = token.strip()
+    if token.upper() == "SOL":
+        price = get_price_cached("SOL", fetch_sol_price)
+        return f"1 SOL = ${price:.4f}"
+
+    entry = TOKEN_REGISTRY.get(token.upper())
+    if not entry and len(token) >= 32:  # possibly a mint address
+        entry = ADDRESS_REGISTRY.get(token)
+        if not entry:
+            entry = fetch_and_register_token_metadata(token)
+
+    if not entry:
+        return f"❌ Token '{token}' not found."
+
+    sol_price = get_price_cached("SOL", fetch_sol_price)
+    token_per_sol = fetch_token_to_sol_price(entry["address"], entry["decimals"])
+    price = token_per_sol * sol_price
+    return f"1 {entry.get('symbol', token)} = ${price:.6f}" if price > 0 else f"❌ No price found for {token}"
+
+def get_token_address(token: str) -> str:
+    token = token.strip()
+    entry = TOKEN_REGISTRY.get(token.upper())
+    if not entry and len(token) >= 32:
+        entry = ADDRESS_REGISTRY.get(token)
+        if not entry:
+            entry = fetch_and_register_token_metadata(token)
+
+    if not entry:
+        return f"❌ Token '{token}' not found."
+
+    return f"🔹 Address: {entry['address']} (decimals: {entry['decimals']})"
+
+
+# ---- Fallback Metadata Fetch ----
+def fetch_and_register_token_metadata(mint: str):
     try:
         res = requests.get(f"https://token.jup.ag/info?mint={mint}", timeout=10)
         if res.status_code == 200:
             data = res.json()
             symbol = data.get("symbol", mint[:4]).upper()
             decimals = data.get("decimals", 6)
-            ADDRESS_MAP[mint] = {"symbol": symbol, "decimals": decimals}
-            add_symbol_variants(symbol, {"address": mint, "decimals": decimals})
-            return symbol, decimals
+            register_token(symbol, mint, decimals)
+            return {"address": mint, "decimals": decimals, "symbol": symbol}
     except Exception:
         pass
-    return mint[:4].upper(), 6  # fallback
-
-
-def find_token_matches(symbol: str):
-    symbol = symbol.strip()
-    keys_to_try = {
-        symbol,
-        symbol.upper(),
-        symbol.lower(),
-        symbol.upper().lstrip("$"),
-        symbol.lower().lstrip("$"),
-        f"${symbol.upper().lstrip('$')}"
-    }
-    for key in keys_to_try:
-        if key in TOKEN_MAP:
-            return key, TOKEN_MAP[key]
-    return None, None
-
-
-def get_token_price(token: str) -> str:
-    token_upper = token.upper()
-    if token_upper == "SOL":
-        sol_price = get_price_cached("SOL", fetch_sol_price)
-        return f"1 SOL = ${sol_price:.4f}"
-
-    _, matches = find_token_matches(token)
-
-    # If not found, maybe it's a mint address
-    if not matches and len(token) >= 32:
-        if token in ADDRESS_MAP:
-            info = ADDRESS_MAP[token]
-            matches = [{"address": token, "decimals": info["decimals"]}]
-            token_upper = info["symbol"]
-        else:
-            symbol, decimals = fetch_token_metadata(token)
-            matches = [{"address": token, "decimals": decimals}]
-            token_upper = symbol
-
-    if not matches:
-        return f"❌ Token '{token}' not found."
-
-    sol_price = get_price_cached("SOL", fetch_sol_price)
-    results = []
-
-    for entry in matches:
-        try:
-            token_per_sol = fetch_token_to_sol_price(entry["address"], entry["decimals"])
-            token_price = token_per_sol * sol_price
-            if token_price > 0:
-                results.append(f"1 {token_upper} ({entry['address'][:4]}...): ${token_price:.6f}")
-        except Exception:
-            continue
-
-    return "\n".join(results) if results else f"❌ No valid prices found for '{token}'"
-
-
-def get_token_address(token: str) -> str:
-    _, matches = find_token_matches(token)
-
-    if not matches and len(token) >= 32:
-        if token in ADDRESS_MAP:
-            matches = [{"address": token, "decimals": ADDRESS_MAP[token]["decimals"]}]
-        else:
-            symbol, decimals = fetch_token_metadata(token)
-            matches = [{"address": token, "decimals": decimals}]
-
-    if not matches:
-        return f"❌ Token '{token}' not found."
-
-    results = []
-    for entry in matches:
-        results.append(f"🔹 Address: {entry['address']} (decimals: {entry['decimals']})")
-
-    return "\n".join(results)
+    return None
