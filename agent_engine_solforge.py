@@ -5,20 +5,9 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
-from tools.mongo_tools import find_one_mongo, query_mongo
+from tools.solforge_mongo_tools import find_one_mongo, query_mongo
 from tools.token_tools import fetch_sol_price
-from tools.solforge_mongo_tools import (
-    get_solforge_user_by_name,
-    query_solforge_users,
-    query_solforge_coins,
-    query_solforge_coinstatuses,
-    query_solforge_scratchhistories,
-    query_solforge_spinhistories,
-    get_coinstatuses_by_coin_name,
-    get_coinstatuses_by_user_id,
-    get_scratchhistories_by_wallet,
-    get_spinhistories_by_wallet
-)
+
 
 load_dotenv()
 llm = OpenAI(model="gpt-4-turbo")
