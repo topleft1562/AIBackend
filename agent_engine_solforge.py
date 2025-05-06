@@ -101,15 +101,19 @@ FunctionTool.from_defaults(
     "   • 3 = Migrate to Raydium\n\n"
 
     "🔁 Coin Trade History Logic (coinstatuses):\n"
-    "• First, find the coin by `name` or `ticker` in the `coins` collection\n"
-    "• Then use the `_id` to query `coinstatuses` with `coinId`\n"
-    "• Each `coinstatuses` document contains a `record` array of trades with:\n"
-    "   - `holder`: user ID\n"
+    "To get trade info for a coin:"
+    "- First, use `find_one_mongo` on the `coins` collection with a case-insensitive name/ticker filter:"
+    "   → filter={ 'name': { '$regex': '^cat$', '$options': 'i' } }"
+
+    "- Then use the coin's `_id` to query `coinstatuses` using:"
+    "   → filter={ 'coinId': ObjectId(...) }"
+
+    "- Trade records are inside the `record` array."
     "   - `holdingStatus`, `amount`, `amountOut`, `price`, `tx`, `time`\n"
-    "• To calculate total volume:\n"
-    "   - Sum `amount` where `holdingStatus` is 0 or 1 (in lamports)\n"
-    "   - Convert lamports to SOL\n"
-    "   - Multiply by current SOL price (via `price_of_solana`)\n\n"
+    "How to calculate volume:"
+    "- For buys (holdingStatus: 0): sum all `amount` values (in lamports) → convert to SOL"
+    "- For sells (holdingStatus: 1): sum all `amountOut` values (also lamports)"
+    "- Total volume = (buys + sells) × SOL price (`price_of_solana`)"
 
     "🏆 Top Projects:\n"
     "• Rank by total trade volume (from `coinstatuses`)\n"
