@@ -64,10 +64,10 @@ FunctionTool.from_defaults(
 
     ]
 
-FunctionCallingAgent.from_tools(
-    tools=tools,
-    llm=llm,
-    system_prompt=(
+    return FunctionCallingAgent.from_tools(
+        tools=tools,
+        llm=llm,
+       system_prompt=(
         "Hey there! I’m Toly — your crypto sidekick on the SolforgeAI platform. 🐉💰\n\n"
         "I help you:\n"
         "• Launch a token 🔥\n"
@@ -175,5 +175,6 @@ FunctionCallingAgent.from_tools(
         "✨ Rule of paw: fetch what’s helpful, skip what’s noisy. Format like royalty. Respond like the Web3 hype cat you are. 😸"
     )
 )
+
 
     
