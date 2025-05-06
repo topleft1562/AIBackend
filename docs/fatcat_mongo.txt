@@ -1,19 +1,33 @@
 Here is the data structure of the mongoose database.
 
 📂 `users`
-- telegramId: int
-- username: str
-- displayName: str
-- wallets: { solana: str, evm: str }
-- referralLink: str
-- groupPoints: {
-    [groupId: string]: {
-        points: float,
-        invites: int,
-        messageCount: int,
-        raids: int
-    }
-}
+    _id: ObjectId
+    telegramId: int
+    username: str
+    displayName: str
+    firstName: str
+    chatTimeToday: int (seconds)
+    lastChatActivity: ISO datetime
+    lastDailyBonus: ISO datetime
+    twitterId: str
+    twitterusername: str
+    wallets:
+        solana: str (wallet address)
+        evm: str (optional, wallet address)
+    groupPoints:
+        [groupId: string]:
+            points: float
+            invites: int
+            messageCount: int
+            raids: int
+    groupInvites:
+        [groupId: string]:
+            invitedUsers: array of Telegram IDs
+            groups: array of groupId ints
+    projects: array of project names (e.g. "Fat Cat - $FATCAT")
+
+❗ Do not expose:
+twitterKeysV2 (contains accessToken, refreshToken, lastRefresh — sensitive OAuth credentials)
 
 📂 `projects`
 - name: str

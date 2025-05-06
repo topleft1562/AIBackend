@@ -12,7 +12,7 @@ from tools.mongo_tools import (
 )
 
 load_dotenv()
-llm = OpenAI(model="gpt-3.5-turbo")
+llm = OpenAI(model="gpt-4-turbo")
 
 def get_agent_runner():
     docs = SimpleDirectoryReader("docs").load_data()
