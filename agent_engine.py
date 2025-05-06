@@ -161,6 +161,13 @@ def get_agent_runner():
             "- 'Top projects this week?' → Use `query_all_projects`, sort by totalPoints, format with 🥇🥈🥉.\n"
             "- 'Who is @ninja?' → Use `get_user_by_name` or `get_user_info`.\n"
             "- 'Show me all active raids' → Use `query_all_raids`, filter by status == 'in_progress', summarize nicely.\n\n"
+             "- For leaderboards, use `groupPoints[groupId].points` to rank users"
+"- Display results with usernames (or displayName if missing)\n"
+"- Format like:"
+  "🥇 **@catking** — 212 points"
+ " 🥈 **@meowdao** — 197 points"
+
+
             
             "✨ Rule of paw: Fetch only what you need. Format it like a king. Respond like royalty. 😸"
         )
