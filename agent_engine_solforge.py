@@ -5,7 +5,7 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
-from tools.solforge_mongo_tools import find_one_mongo, query_mongo
+from tools.solforge_mongo_tools import find_one_mongo, query_mongo, get_coin_volume
 from tools.token_tools import fetch_sol_price
 
 
@@ -30,6 +30,16 @@ def get_solforge_agent():
             name="solforge_docs",
             description="General questions about Solforge: how to launch a token, what the platform offers, and feature explanations."
         ),
+
+FunctionTool.from_defaults(
+    fn=lambda name: calculate_solforge_coin_volume(str(name)),
+    name="get_coin_volume",
+    description=(
+        "Get total volume traded for a token by name or ticker.\n"
+        "Volume is the sum of SOL in buy/sell trades × current SOL price.\n"
+        "Returns token name, ticker, # of trades, total SOL volume, and USD estimate."
+    )
+),
 
 FunctionTool.from_defaults(
     fn=query_mongo,
@@ -100,6 +110,44 @@ FunctionTool.from_defaults(
     "   • 1 = Sell (amount = tokens in, amountOut = SOL)\n"
     "   • 2 = Launch (initial status)\n"
     "   • 3 = Migrate to Raydium\n\n"
+
+    "🔁 Coin Trade History Logic (coinstatuses):"
+
+"To get a token’s trade history:"
+"1. First, find the coin in the coins collection by name or ticker."
+"2. Then use its _id to query coinstatuses using coinId."
+
+"Each coinstatuses entry contains a record array with trades."
+
+"holdingStatus:"
+
+"0 = Buy (user spends SOL)"
+
+"1 = Sell (user receives SOL)"
+
+"2 = Launch"
+
+"3 = Migrate"
+
+"amount: Amount input"
+
+"On Buy: it's SOL"
+
+"On Sell: it's tokens"
+
+"amountOut: Output of trade"
+
+"On Buy: tokens received"
+
+"On Sell: SOL received"
+
+"To calculate total volume:"
+
+"Sum all amount values where holdingStatus is 0 or 1"
+
+"Convert from lamports to SOL"
+
+"Multiply by current SOL price (use price_of_solana)"
 
     "🎟️ Scratch Ticket Format:\n"
     "- `wNumbers` are the winning numbers\n"
