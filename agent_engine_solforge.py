@@ -5,6 +5,7 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
+from tools.mongo_tools import find_one_mongo, query_mongo
 from tools.token_tools import fetch_sol_price
 from tools.solforge_mongo_tools import (
     get_solforge_user_by_name,
@@ -41,136 +42,37 @@ def get_solforge_agent():
             description="General questions about Solforge: how to launch a token, what the platform offers, and feature explanations."
         ),
 
-        # 👤 Get a single Solforge user by wallet or display name
-        FunctionTool.from_defaults(
-            fn=lambda name: get_solforge_user_by_name(str(name)),
-            name="get_user_by_name_or_wallet",
-            description=(
-                "Find a Solforge user using their wallet or username.\n"
-                "Returns: name, wallet, avatar, isLedger, hasKYC, spins, tokensBonded, holdings (with coinId + amount)."
-            )
-        ),
-        # 🔍 Paginated CoinStatus (Trade Logs)
 FunctionTool.from_defaults(
-    fn=query_solforge_coinstatuses,
-    name="query_all_coinstatuses",
+    fn=query_mongo,
+    name="query_mongo",
     description=(
-        "Paginated list of all token trade records on Solforge.\n"
-        "Each includes:\n"
-        "- coinId: ObjectId (token reference)\n"
-        "- record: array of actions, each with:\n"
-        "  - holder: ObjectId (user)\n"
-        "  - holdingStatus: int (0=buy, 1=sell, 2=launch, 3=migrate)\n"
-        "  - amount: int (input)\n"
-        "  - amountOut: int (output)\n"
-        "  - price: str\n"
-        "  - tx: str\n"
-        "  - time: ISO timestamp"
+        "Run a MongoDB-style query on any FATCAT or SolforgeAI collection.\n\n"
+        "**Arguments:**\n"
+        "- `collection`: str — choose from: 'solforge_users', 'coins', 'coinstatuses', 'scratchhistories', 'spinhistories'\n"
+        "- `filter`: dict — optional Mongo-style filter\n"
+        "- `sort`: dict — optional sort order (e.g. { 'stats.totalPoints': -1 })\n"
+        "- `page`: int — pagination\n"
+        "- `limit`: int — max number of results (default 100)\n\n"
+        "**Examples:**\n"
+        "- Get coins with over 50 replies:\n  filter={ 'replies': { '$gt': 50 } }\n"
+        "- Projects with more than 200 points:\n  filter={ 'stats.totalPoints': { '$gte': 200 } }\n"
+        "- Scratch tickets after April:\n  filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }\n"
+        "- Sort coins by lastPrice descending:\n  sort={ 'lastPrice': -1 }"
     )
 ),
-
-# 🎟️ Paginated Scratch Ticket History
 FunctionTool.from_defaults(
-    fn=query_solforge_scratchhistories,
-    name="query_all_scratchhistories",
+    fn=find_one_mongo,
+    name="find_one_mongo",
     description=(
-        "Paginated scratch ticket plays.\n"
-        "Each includes:\n"
-        "- user: wallet address\n"
-        "- wNumbers: list[int] (winning numbers)\n"
-        "- yNumbers: list[list[int]] (user guesses)\n"
-        "- winnings: str\n"
-        "- wonFreeCard: bool\n"
-        "- createdAt, updatedAt: ISO timestamp"
+        "Find a **single document** from any collection.\n\n"
+        "**Arguments:**\n"
+        "- `collection`: str — e.g. 'solforge_users', 'coins', etc.\n"
+        "- `filter`: dict — Mongo-style match (e.g. { 'wallet': 'Abc123...' })\n\n"
+        "**Examples:**\n"
+        "- Find user by wallet:\n  filter={ 'wallet': 'ABC123...' }\n"
+        "- Find coin by name:\n  filter={ 'name': 'FORGE' }"
     )
-),
-
-# 🎰 Paginated Spin History
-FunctionTool.from_defaults(
-    fn=query_solforge_spinhistories,
-    name="query_all_spinhistories",
-    description=(
-        "Paginated spin game history.\n"
-        "Each includes:\n"
-        "- user: wallet address\n"
-        "- spin: str (spin result or ID)\n"
-        "- matches: str (number of matches)\n"
-        "- winnings: str\n"
-        "- balance: str\n"
-        "- createdAt, updatedAt: ISO timestamp"
-    )
-),
-
-# 📊 Query all Solforge tokens
-FunctionTool.from_defaults(
-    fn=query_solforge_coins,
-    name="query_all_coins",
-    description=(
-        "Paginated list of all tokens launched on Solforge.\n"
-        "Each includes: name, ticker, token address, reserveOne, reserveTwo, lastPrice, replies, social links, isMigrated, autoMigrate, date."
-    )
-),
-
-# 👥 Query all Solforge users
-FunctionTool.from_defaults(
-    fn=query_solforge_users,
-    name="query_all_solforge_users",
-    description=(
-        "Paginated list of Solforge users.\n"
-        "Each includes: name, wallet, avatar, hasKYC, isLedger, tokensBonded, spins, lastFreeSpinEpoch, holdings."
-    )
-),
-
-# 📈 Get coinstatus (trade) history for a specific token
-FunctionTool.from_defaults(
-    fn=lambda name: get_coinstatuses_by_coin_name(str(name)),
-    name="query_coinstatuses_by_coin_name",
-    description=(
-        "Returns trade activity for a token.\n"
-        "Each `record` contains:\n"
-        "- holder: user ID\n"
-        "- holdingStatus: 0 (buy), 1 (sell), 2 (launch), 3 (migrate)\n"
-        "- amount (input), amountOut (output)\n"
-        "- tx: transaction\n"
-        "- time: timestamp"
-    )
-),
-
-# 🔁 Get coinstatus by user
-FunctionTool.from_defaults(
-    fn=lambda user_id: get_coinstatuses_by_user_id(str(user_id)),
-    name="query_coinstatuses_by_user_id",
-    description=(
-        "Returns trade history for a user.\n"
-        "Each trade includes: coinId, holdingStatus, amount, amountOut, tx, time"
-    )
-),
-
-# 🎟️ Scratch ticket history
-FunctionTool.from_defaults(
-    fn=lambda wallet: get_scratchhistories_by_wallet(str(wallet)),
-    name="get_scratchhistories_by_wallet",
-    description=(
-        "Returns recent scratch ticket plays for a wallet.\n"
-        "Each includes:\n"
-        "- wNumbers (winning numbers), yNumbers (user’s picks)\n"
-        "- winnings: amount won\n"
-        "- wonFreeCard: bool\n"
-        "- createdAt: timestamp"
-    )
-),
-
-# 🎰 Spin history
-FunctionTool.from_defaults(
-    fn=lambda wallet: get_spinhistories_by_wallet(str(wallet)),
-    name="get_spinhistories_by_wallet",
-    description=(
-        "Returns spin game history for a user wallet.\n"
-        "Each includes:\n"
-        "- spin ID, balance, matches, winnings\n"
-        "- createdAt, updatedAt: timestamps"
-    )
-),
+)
 
     ]
 
@@ -222,6 +124,43 @@ FunctionTool.from_defaults(
     "🏆 Top Projects:\n"
     "- Sort by number of trades in `coinstatuses`\n"
     "- Show project name, ticker, trade count, and maybe last price\n\n"
+
+    "📚 MongoDB Query Guide (via `query_mongo`)"
+"You can query any collection dynamically using:"
+"→ query_mongo(collection, filter={}, sort={}, page=1, limit=50)"
+
+"💡 Supported Mongo Operators:"
+"- `$gt`, `$lt`, `$gte`, `$lte` – greater/less than"
+"- `$eq`, `$ne` – equal / not equal"
+"- `$in`, `$nin` – match in array"
+"- `$regex` – pattern matching (like search)"
+"- `$exists` – check if field exists"
+
+"🔍 Examples:"
+"- Coins with more than 100 replies:"
+  "→ filter={ 'replies': { '$gt': 100 } }"
+
+"- Projects with name containing “cat”:"
+ " → filter={ 'name': { '$regex': 'cat', '$options': 'i' } }"
+
+"- Users with over 3 raids in a group:"
+"  → filter={ 'groupPoints.-100123456.raids': { '$gt': 3 } }"
+
+"- Spins after April 1:"
+"  → filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }"
+
+"- Sort by points descending:"
+"  → sort={ 'stats.totalPoints': -1 }"
+
+"🧠 If in doubt, use simple filters and explain them step by step."
+
+"🔎 `find_one_mongo`"
+"Use this tool to fetch a single document using any filter."
+"→ find_one_mongo(collection='solforge_users', filter={ 'wallet': 'abc...' })"
+"→ find_one_mongo(collection='coins', filter={ 'name': 'CAT' })"
+
+"⚠️ Only returns the **first** match. Great for wallet lookups, token info, or user checks."
+
 
     "✨ Rule of paw: fetch only what’s helpful. Format it like royalty. Respond like the Web3 hype cat you are. 😸"
 )

@@ -1,0 +1,54 @@
+Here is the structure of the mongo database
+
+📂 `solforge_users`
+- name: str
+- wallet: str
+- avatar: str
+- isLedger: bool
+- hasKYC: bool
+- holdings: [{ coinId: ObjectId, amount: int }]
+- lastFreeSpinEpoch: int
+- spins: int
+- tokensBonded: int
+
+📂 `coins`
+- name: str
+- ticker: str
+- token: str
+- reserveOne: int
+- reserveTwo: int
+- lastPrice: str
+- url: str
+- creator: ObjectId (user)
+- isMigrated: bool
+- autoMigrate: bool
+- telegram/twitter/website: str
+- replies: int
+- date: datetime
+
+📂 `coinstatuses`
+- coinId: ObjectId
+- record: array of:
+  - holder: ObjectId
+  - holdingStatus: 0 = buy, 1 = sell, 2 = launch, 3 = migrate
+  - amount: int
+  - amountOut: int
+  - price: str
+  - tx: str
+  - time: datetime
+
+📂 `scratchhistories`
+- user: str (wallet)
+- wNumbers: array of 6
+- yNumbers: 3 arrays of 6
+- winnings: str
+- wonFreeCard: bool
+- createdAt: datetime
+
+📂 `spinhistories`
+- user: str (wallet)
+- balance: str
+- spin: str
+- matches: str
+- winnings: str
+- createdAt: datetime

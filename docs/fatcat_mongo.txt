@@ -1,0 +1,41 @@
+Here is the data structure of the mongoose database.
+
+📂 `users`
+- telegramId: int
+- username: str
+- displayName: str
+- wallets: { solana: str, evm: str }
+- referralLink: str
+- groupPoints: {
+    [groupId: string]: {
+        points: float,
+        invites: int,
+        messageCount: int,
+        raids: int
+    }
+}
+
+📂 `projects`
+- name: str
+- displayName: str
+- groupId: int
+- telegramId: str
+- inviteLink: str
+- stats: { totalPoints: float, memberCount: int }
+
+📂 `raids`
+- groupId: int
+- status: 'in_progress' | 'completed'
+- tweetUrl: str
+- tweetContent: { text: str, author: { username: str }, media: [] }
+- createdAt: datetime
+- duration: int
+- requiredActions: { like, retweet, reply, bookmark: bool }
+- statistics: { likes, retweets, replies, bookmarks: int }
+- participants: array of users
+
+📂 `group_subs`
+- groupId: int
+- tier: str
+- subscribedAt: ISO datetime
+- renewalDate: ISO datetime
