@@ -1,11 +1,13 @@
 import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
+from agent_engine_solforge import get_solforge_agent
 
 app = Flask(__name__)
 
 # Initialize FatCat agent
 agent = get_agent_runner()
+solAgent = get_solforge_agent()
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -29,7 +31,7 @@ def chat():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/toly", methods=["POST"])
-def chat():
+def  chat_toly():
     data = request.json
     message = data.get("message", "")
 
@@ -37,7 +39,7 @@ def chat():
         return jsonify({"error": "Missing message"}), 400
 
     try:
-        response = agent.chat(message)
+        response = solAgent.chat_toly(message)
         return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
