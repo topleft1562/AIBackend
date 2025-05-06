@@ -5,7 +5,7 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
-from tools.solforge_mongo_tools import find_one_mongo, query_mongo, get_coin_volume
+from tools.solforge_mongo_tools import find_one_mongo, query_mongo, calculate_solforge_coin_volume
 from tools.token_tools import fetch_sol_price
 
 
@@ -33,7 +33,7 @@ def get_solforge_agent():
 
 FunctionTool.from_defaults(
     fn=lambda name: calculate_solforge_coin_volume(str(name)),
-    name="get_coin_volume",
+    name="calculate_solforge_coin_volume",
     description=(
         "Get total volume traded for a token by name or ticker.\n"
         "Volume is the sum of SOL in buy/sell trades × current SOL price.\n"
