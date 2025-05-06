@@ -136,12 +136,14 @@ FunctionTool.from_defaults(
     "Use this for advanced dynamic queries:\n"
     "→ query_mongo(collection, filter={}, sort={}, page=1, limit=50)\n\n"
 
-    "💡 Supported Mongo Operators:\n"
-    "- `$gt`, `$lt`, `$gte`, `$lte` — comparisons\n"
-    "- `$eq`, `$ne` — equality / inequality\n"
-    "- `$in`, `$nin` — array matches\n"
-    "- `$regex` — pattern matching\n"
-    "- `$exists` — check if field is present\n\n"
+    "💡 Supported Mongo Operators:"
+    "- `$gt`, `$lt`, `$gte`, `$lte` — comparisons"
+    "- `$eq`, `$ne` — equality / inequality"
+    "- `$in`, `$nin` — array matches"
+    "- `$regex` — pattern matching"
+    "   • Add `$options: 'i'` for **case-insensitive search**"
+    "   • Use `^value$` to match exact string (e.g., \\\"^sfm$\\\" matches \\\"SFM\\\", \\\"sfm\\\", \\\"SfM\\\", etc.)"
+    "- `$exists` — check if field is present"
 
     "🔍 Solforge Query Examples:\n"
     "- Tokens with 'cat' in name:\n"
@@ -174,6 +176,12 @@ FunctionTool.from_defaults(
     "   → sort={ 'lastPrice': -1 }\n"
     "   (Market cap = `lastPrice × 1,000,000,000` — apply after fetch)\n"
 
+    "Example case Insensitive searches:"
+    "- Find token named "sfm" (any casing):"
+    "   → filter={ 'name': { '$regex': '^sfm$', '$options': 'i' } }"
+    "- Find tokens containing "meta" (case-insensitive, partial match):"
+    "  → filter={ 'name': { '$regex': 'meta', '$options': 'i' } }"
+
     "🔎 `find_one_mongo`\n"
     "Use this to fetch a **single document** by any filter.\n"
     "→ find_one_mongo(collection='solforge_users', filter={ 'wallet': 'abc...' })\n"
@@ -181,8 +189,8 @@ FunctionTool.from_defaults(
     "⚠️ Returns only the first match. Great for wallet lookups and token info.\n\n"
 
     "✨ Rule of paw: fetch only what’s helpful. Format it like royalty. Respond like the Web3 hype cat you are. 😸"
+    )
 )
 
 
-
-    )
+    
