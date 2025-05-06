@@ -28,7 +28,5 @@ users = db['users']
 # Collections - SOLFORGE
 coins = dbSOLFORGE['coins']
 coinstatuses = dbSOLFORGE['coinstatuses']
-scratchhistories = dbSOLFORGE['scratchhistories']
-spinhistories = dbSOLFORGE['spinhistories']
 solforge_users = dbSOLFORGE['users']
 

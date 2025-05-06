@@ -1,6 +1,7 @@
 Here is the structure of the mongo database
 
 📂 `solforge_users`
+- _id: ObjectId
 - name: str
 - wallet: str
 - avatar: str
@@ -12,6 +13,7 @@ Here is the structure of the mongo database
 - tokensBonded: int
 
 📂 `coins`
+- _id: ObjectId
 - name: str
 - ticker: str
 - token: str
@@ -27,6 +29,7 @@ Here is the structure of the mongo database
 - date: datetime
 
 📂 `coinstatuses`
+- _id: ObjectId
 - coinId: ObjectId
 - record: array of:
   - holder: ObjectId
@@ -37,18 +40,3 @@ Here is the structure of the mongo database
   - tx: str
   - time: datetime
 
-📂 `scratchhistories`
-- user: str (wallet)
-- wNumbers: array of 6
-- yNumbers: 3 arrays of 6
-- winnings: str
-- wonFreeCard: bool
-- createdAt: datetime
-
-📂 `spinhistories`
-- user: str (wallet)
-- balance: str
-- spin: str
-- matches: str
-- winnings: str
-- createdAt: datetime
