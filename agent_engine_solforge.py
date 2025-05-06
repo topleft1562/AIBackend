@@ -5,7 +5,7 @@ from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
-from tools.solforge_mongo_tools import find_one_mongo, query_mongo, calculate_solforge_coin_volume
+from tools.solforge_mongo_tools import find_one_mongo, query_mongo
 from tools.token_tools import fetch_sol_price
 
 
