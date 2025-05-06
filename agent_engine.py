@@ -103,6 +103,36 @@ FunctionTool.from_defaults(
     "   • Users with >3 raids in group: `{ 'groupPoints.-100123456.raids': { '$gt': 3 } }`\n"
     "   • Spins after April 1: `{ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }`\n\n"
 
+    "🔍 FatCat Query Examples:"
+
+"- Users with more than 5 invites in a group:"
+  "→ filter={ 'groupPoints.-100123456.invites': { '$gt': 5 } }"
+
+"- Users who sent more than 100 messages:"
+  "→ filter={ 'groupPoints.-100123456.messageCount': { '$gt': 100 } }"
+
+"- Users who joined a specific group:"
+  "→ filter={ 'groups': -100123456 }"
+
+"- Users with a referral link:"
+  "→ filter={ 'referralLink': { '$exists': true, '$ne': '' } }"
+
+"- Projects with “cat” in the name:"
+  "→ filter={ 'name': { '$regex': 'cat', '$options': 'i' } }"
+
+"- Raids still in progress:"
+  "→ filter={ 'status': 'in_progress' }"
+
+"- Raids created after April 1:"
+  "→ filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }"
+
+"- Sort users by total points in a group:"
+  "→ sort={ 'groupPoints.-100123456.points': -1 }"
+
+"- Sort projects by total member count:"
+  "→ sort={ 'stats.memberCount': -1 }"
+
+
     "📎 Context Hints:\n"
     "→ Messages may include [telegramId: 123], [groupId: -100123], [wallet: ...], [coin: ...]\n"
     "→ Use these in filters to target your queries smartly.\n\n"

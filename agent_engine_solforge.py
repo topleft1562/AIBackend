@@ -121,13 +121,25 @@ FunctionTool.from_defaults(
     "- Track user’s spin ID, winnings, and balance\n"
     "- Use emoji and line breaks to keep info clean\n\n"
 
-    "🏆 Top Projects:\n"
-    "- Sort by number of trades in `coinstatuses`\n"
-    "- Show project name, ticker, trade count, and maybe last price\n\n"
+   "🏆 Top Projects:"
+  "- Sort based on total **trade volume** in `coinstatuses`:"
+  "- For buys (`holdingStatus: 0`): `amount` = SOL input"
+  "- For sells (`holdingStatus: 1`): `amountOut` = SOL output"
+  "- Total volume = sum of all SOL traded (buys + sells) × current SOL price"
+  "- Use `price_of_solana` tool to fetch SOL price when needed"
+
+  "- Additionally assess **market cap**:"
+  "- All tokens have a fixed total supply of `1,000,000,000`"
+  "- Market cap = `lastPrice` × `1,000,000,000`"
+  "- Use `lastPrice` field from the `coins` collection"
+
+"📊 Example output:"
+"- **$BULLRUN** — 1.2k trades | 💸 Volume: 48.3 SOL | 🧮 Market Cap: 1.2M"
+"- **$MOON** — 965 trades | 💸 Volume: 35.7 SOL | 🧮 Market Cap: 820k"
 
     "📚 MongoDB Query Guide (via `query_mongo`)"
-"You can query any collection dynamically using:"
-"→ query_mongo(collection, filter={}, sort={}, page=1, limit=50)"
+    "You can query any collection dynamically using:"
+    "→ query_mongo(collection, filter={}, sort={}, page=1, limit=50)"
 
 "💡 Supported Mongo Operators:"
 "- `$gt`, `$lt`, `$gte`, `$lte` – greater/less than"
@@ -136,21 +148,29 @@ FunctionTool.from_defaults(
 "- `$regex` – pattern matching (like search)"
 "- `$exists` – check if field exists"
 
-"🔍 Examples:"
+"🔍 Solforge Query Examples:"
+
 "- Coins with more than 100 replies:"
   "→ filter={ 'replies': { '$gt': 100 } }"
 
-"- Projects with name containing “cat”:"
- " → filter={ 'name': { '$regex': 'cat', '$options': 'i' } }"
+"- Tokens containing “cat” in the name:"
+  "→ filter={ 'name': { '$regex': 'cat', '$options': 'i' } }"
 
-"- Users with over 3 raids in a group:"
-"  → filter={ 'groupPoints.-100123456.raids': { '$gt': 3 } }"
+"- Users with more than 3 spins:"
+ " → filter={ 'spins': { '$gt': 3 } }"
 
-"- Spins after April 1:"
-"  → filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }"
+"- Scratch tickets after April 1:"
+  "→ filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }"
 
-"- Sort by points descending:"
-"  → sort={ 'stats.totalPoints': -1 }"
+"- Coin trades where price is below 0.00001:"
+  "→ filter={ 'record.price': { '$lt': '0.00001' } }"
+
+"- Sort coins by latest launch:"
+  "→ sort={ 'date': -1 }"
+
+"- Sort users by tokens bonded:"
+  "→ sort={ 'tokensBonded': -1 }"
+
 
 "🧠 If in doubt, use simple filters and explain them step by step."
 

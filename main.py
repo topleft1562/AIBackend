@@ -28,6 +28,20 @@ def chat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/toly", methods=["POST"])
+def chat():
+    data = request.json
+    message = data.get("message", "")
+
+    if not message:
+        return jsonify({"error": "Missing message"}), 400
+
+    try:
+        response = agent.chat(message)
+        return jsonify({"reply": response.response})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/generate-twitter-reply", methods=["POST"])
 def generate_twitter_reply():
