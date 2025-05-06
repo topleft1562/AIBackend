@@ -1,3 +1,4 @@
+from bson import ObjectId
 from tools.db import coins, coinstatuses, solforge_users
 
 def query_mongo(
@@ -42,3 +43,23 @@ def find_one_mongo(collection: str, filter: dict):
         return result or f"❌ No result found with filter: {filter}"
     except Exception as e:
         return f"❌ Mongo find_one failed: {str(e)}"
+
+def get_coin_info(name_or_ticker: str):
+    # Case-insensitive match on name or ticker
+    coin = coins.find_one({
+        "$or": [
+            { "name": { "$regex": f"^{name_or_ticker}$", "$options": "i" } },
+            { "ticker": { "$regex": f"^{name_or_ticker}$", "$options": "i" } }
+        ]
+    })
+    return coin if coin else f"❌ No coin found with name or ticker '{name_or_ticker}'"
+
+def get_coinstatuses_for_coin(name_or_ticker: str):
+    from .helpers import get_coin_info  # Import the function you just made
+
+    coin = get_coin_info(name_or_ticker)
+    if not coin or isinstance(coin, str):  # If it's an error string
+        return coin
+
+    coin_id = coin["_id"]
+    return list(coinstatuses.find({ "coinId": ObjectId(coin_id) }).sort("time", -1).limit(100))
