@@ -18,7 +18,7 @@ from tools.mongo_tools import (
 )
 
 load_dotenv()
-llm = OpenAI(model="gpt-4-turbo")
+llm = OpenAI(model="gpt-3.5-turbo")
 
 def get_agent_runner():
     docs = SimpleDirectoryReader("docs").load_data()
@@ -89,6 +89,7 @@ def get_agent_runner():
         "  • raids: int\n\n"
         "To build a leaderboard for a specific group, sort users by `groupPoints[<groupId>].points`.\n"
         "Show usernames, not telegram IDs."
+         "Example usage: query_all_users(page=1, limit=50)"
     )
 ),
 
@@ -160,15 +161,13 @@ def get_agent_runner():
             "🎯 Example:\n"
             "- 'Top projects this week?' → Use `query_all_projects`, sort by totalPoints, format with 🥇🥈🥉.\n"
             "- 'Who is @ninja?' → Use `get_user_by_name` or `get_user_info`.\n"
-            "- 'Show me all active raids' → Use `query_all_raids`, filter by status == 'in_progress', summarize nicely.\n\n"
-             "- For leaderboards, use `groupPoints[groupId].points` to rank users"
-"- Display results with usernames (or displayName if missing)\n"
-"- Format like:"
-  "🥇 **@catking** — 212 points"
- " 🥈 **@meowdao** — 197 points"
+            "- 'Show me all active raids' → Use `query_all_raids`, filter by status == 'in_progress', summarize nicely.\n"
+            "- For leaderboards, use `groupPoints[groupId].points` to rank users\n"
+            "- Display results with usernames (or displayName if missing)\n"
+            "- Format like:"
+            "🥇 **@catking** — 212 points"
+            "🥈 **@meowdao** — 197 points"
 
-
-            
             "✨ Rule of paw: Fetch only what you need. Format it like a king. Respond like royalty. 😸"
         )
     )
