@@ -35,7 +35,7 @@ FunctionTool.from_defaults(
     fn=query_mongo,
     name="query_mongo",
     description=(
-        "Run a MongoDB-style query on any FATCAT or SolforgeAI collection.\n\n"
+        "Run a MongoDB-style query on any SolforgeAI collection.\n\n"
         "**Arguments:**\n"
         "- `collection`: str — choose from: 'solforge_users', 'coins', 'coinstatuses', 'scratchhistories', 'spinhistories'\n"
         "- `filter`: dict — optional Mongo-style filter\n"

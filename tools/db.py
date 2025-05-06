@@ -17,7 +17,7 @@ clientSOLFORGE = MongoClient(MONGODB_URI_SOLFORGE)
 
 # ✅ Explicitly select the correct DB
 db = client["mainnet-beta"]
-dbSOLFORGE = client["main"]
+dbSOLFORGE = clientSOLFORGE["main"]
 
 # Collections - FATCAT
 group_subs = db['groupSubscriptions']
