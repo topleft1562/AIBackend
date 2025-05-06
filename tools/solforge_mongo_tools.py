@@ -55,11 +55,9 @@ def get_coin_info(name_or_ticker: str):
     return coin if coin else f"❌ No coin found with name or ticker '{name_or_ticker}'"
 
 def get_coinstatuses_for_coin(name_or_ticker: str):
-    from .helpers import get_coin_info  # Import the function you just made
-
     coin = get_coin_info(name_or_ticker)
-    if not coin or isinstance(coin, str):  # If it's an error string
+    if not coin or isinstance(coin, str):
         return coin
 
     coin_id = coin["_id"]
-    return list(coinstatuses.find({ "coinId": ObjectId(coin_id) }).sort("time", -1).limit(100))
+    return list(coinstatuses.find({ "coinId": coin_id }).sort("time", -1).limit(100))
