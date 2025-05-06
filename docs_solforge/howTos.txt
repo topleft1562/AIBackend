@@ -1,0 +1,37 @@
+1) creating a token / launch
+  goto https://dapp.solforgeai.com
+  click "Forge a New token"
+    Enter Name, Ticker, Description and upload a logo for your token
+  option 1: you can click the socials button and include
+      Twitter
+      website
+      telegram
+  option 2: you can click use ai logo generator and have it generate logo's for you ( 2 generations every 24 hrs )
+
+  Alternatively you can click quick AI launch. and simply enter information about your project for it to launch.
+  can be as simple as "launch a token"
+    any other information will be used to create your AI generated token specific to the information you provide.
+    ideas for information to provide you can be as detailed as you want.
+  Click the socials button to add social links.
+
+Finally you can also open Toly AI chatbox and ask it to create a token for you. again being as detailed as you like and you can include but do not have to include
+    - name
+    - ticker
+    - colors
+    - theme    
+    if you have socials made include them so they can be linked to token
+      - website
+      - telegram
+      - twitter
+
+  2) buying / selling tokens from a project launched
+    goto https://dapp.solforgeai.com
+  search for find and click on the projects icon to enter its menu
+  in the trade menu choose how much you want to spend and click buy token
+  if selling choose how much you want to sell and click sell token
+
+3) connecting your wallet is as easy as clicking connect wallet button
+  choosing your wallet of choice
+  and signing the message in your wallet. ( this confirms your account to your user profile on our site. ) 
+      ** no funds are transfered, no permissions given. you are simply signing a message proving ownership of your account. **
+  Swap accounts by simply changing accounts in your wallet. choose the wallet provider and sign again IF new user connection.

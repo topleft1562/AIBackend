@@ -21,7 +21,7 @@ load_dotenv()
 llm = OpenAI(model="gpt-4-turbo")
 
 def get_agent_runner():
-    docs = SimpleDirectoryReader("docs2").load_data()
+    docs = SimpleDirectoryReader("docs").load_data()
     index = VectorStoreIndex.from_documents(docs)
     tools = [
         ## Token tools
@@ -135,10 +135,12 @@ def get_agent_runner():
             "- `get_project_by_name`, `get_project_by_group_id`\n\n"
 
             "🧠 When answering:\n"
-            "- Use `query_*` tools to access full datasets (limit: 100 entries).\n"
+            "- Use `query_*` tools to access full datasets (limit: 100 entries per page).\n"
             "- Use `get_*` tools for specific lookups (e.g. a single user or project).\n"
             "- Format answers as Telegram messages: **bold names**, emoji bullets, readable sections.\n"
-            "- NEVER respond with raw JSON unless asked.\n\n"
+            "- NEVER respond with raw JSON unless asked.\n"
+            "- Use telegram usernames not telegram id's in your responses.\n"
+            "- Display points for users, or groups when important.\n\n"
 
             "📎 Context may appear at the end like:\n"
             "[telegramId: 123456], [groupId: -100123456]\n"

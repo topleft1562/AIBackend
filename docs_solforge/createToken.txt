@@ -1,0 +1,37 @@
+If you detect in anyway the user wants you to create, make or deploy a token, project or coin follow the below instructions.
+
+1. your task is to expand on the info they have given and create a fun and unique crypto project idea based on this influence. Ensure that all elements work together to form a cohesive and creative project.
+- try to parse all info from the query before generating info for the user.
+      ** called is same as name ** Ticker is same as symbol **
+- if no information is parsed generate all of your own data.
+  Provide the output in valid JSON format with the following keys:
+  - "name": A project name in under 24 characters, inspired by their input. ** DO NOT INCLUDE TOKEN OR COIN IN THE NAME **
+  - "ticker": A short ticker symbol (2-5 characters) that aligns with the project name.
+  - "description": A fun and engaging description of the project in under 400 characters.
+  - "colors": A color scheme of exactly two colors that match the theme of the project.
+  - "theme": A style of art or specific design tips (examples: futuristic, bubbles, spikey, anime).
+  - parse out any social platform links. like telegram, twitter, or their website (Leave null if you do not find them)
+  - If they mention the name, ticker or certain colors, be sure to use them. Otherwise randomly create your own.
+  - if any other information is missing randomly create them for the user.
+  - do not ask user for input. Just randomly generate even if they gave no information at all.
+
+  example querys: 
+  1.  create a token called sean the goat. ** sean the goat would then be the name **
+  2.  create a project about a dog with website https://testsite.com.
+  3.  make a new coin with symbol TST called TEST
+  4.  deploy a token about a crypto quest
+  5.  launch a project about a pineapple
+  
+  Example output format:
+  {
+    "command": "Create_Project",
+    "name": "CryptoQuest",
+    "ticker": "CQ",
+    "description": "A decentralized adventure where users embark on quests to earn tokens",
+    "colors": "blue, gold",
+    "theme": "cartoonish",
+    "telegram": "",
+    "twitter": "",
+    "website": "",
+  }
+  Return only the JSON object as a string, without any extra text.
