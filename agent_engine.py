@@ -72,15 +72,26 @@ def get_agent_runner():
 
         ## MongoDB data access tools
         FunctionTool.from_defaults(
-            fn=query_users,
-            name="query_all_users",
-            description=(
-                "Query the users collection. Supports pagination with `page` and `limit`.\n"
-                "Each user includes: telegramId (int), username (str), displayName (str), wallets (dict of 'solana' and/or 'evm'), "
-                "groupPoints (dict indexed by groupId: { points, invites, messageCount, raids }), and referralLink (str).\n"
-                "Example usage: query_all_users(page=1, limit=50)"
-            )
-        ),
+    fn=query_users,
+    name="query_all_users",
+    description=(
+        "Query the FATCAT users collection. Supports pagination with `page` and `limit`.\n"
+        "Each user includes:\n"
+        "- telegramId: int\n"
+        "- username: str\n"
+        "- displayName: str\n"
+        "- wallets: { solana, evm }\n"
+        "- referralLink: str\n"
+        "- groupPoints: dict where keys are groupId (as strings), and values are:\n"
+        "  • points: float\n"
+        "  • invites: int\n"
+        "  • messageCount: int\n"
+        "  • raids: int\n\n"
+        "To build a leaderboard for a specific group, sort users by `groupPoints[<groupId>].points`.\n"
+        "Show usernames, not telegram IDs."
+    )
+),
+
         FunctionTool.from_defaults(
             fn=query_projects,
             name="query_all_projects",
