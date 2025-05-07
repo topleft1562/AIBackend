@@ -1,13 +1,11 @@
 import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner          # FatCat agent
-from agent_engine_solforge import get_solforge_agent  # Toly agent
 
 app = Flask(__name__)
 
 # Initialize agents
 agent = get_agent_runner()
-solAgent = get_solforge_agent()
 
 # 🔹 FatCat endpoint
 @app.route("/chat", methods=["POST"])
@@ -30,20 +28,6 @@ def chat_fatcat():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 🔹 SolforgeAI endpoint
-@app.route("/toly", methods=["POST"])
-def chat_toly():
-    data = request.json
-    message = data.get("message", "")
-
-    if not message:
-        return jsonify({"error": "Missing message"}), 400
-
-    try:
-        response = solAgent.chat(message)
-        return jsonify({"reply": response.response})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 # 🔹 Twitter reply generator (uses FatCat LLM)
 @app.route("/generate-twitter-reply", methods=["POST"])

@@ -1,0 +1,159 @@
+📝 COMMAND HELP
+━━━━━━━━━━━━━━━
+
+{command}
+
+📋 Info:
+• {description}
+• Use: {usage}
+• Ex: {example}
+
+━━━━━━━━━━━━━━━
+
+🌟 Earn Points:
+
+💬 Chat Activity:
+• +5 points hourly bonus
+• +15 points daily bonus
+• +0.1 points per min active
+
+🤝 Community Growth:
+• +75 points per referral
+• (in development)
+
+🎯 Raid Participation:
+• ❤️ Like tweet (+1p)
+• 🔄 Retweet (+2p)
+• 💬 Reply (+3p)
+• 🔖 Bookmark (+2p)
+
+🚀 Projects & Rewards:
+• Join community projects
+• Connect wallets for airdrops
+• Special event bonuses
+
+
+🔧 Admin Commands
+
+📊 Community Management:
+/addgroup - Add a group to allowed list
+/removegroup - Remove a group from allowed list
+/raid - add a raid to the list.
+
+👤 User Commands
+/addMe - Add me to your group!
+/fatcat - View Main Menu!
+
+🎯 Profile & Points:
+/profile - View your referral profile.
+/projects - View and interact with projects.
+/leaderboard - Check top community members.
+/top5 - View Top Projects using Fat Cat!
+
+🏆 Contests:
+/contest - View active contest and leaderboard.
+
+⚔️ Raids:
+/raids - View active raids in the group.
+
+🌟 Projects:
+Use buttons in profile to:
+• View available projects
+• Join community initiatives
+• Track your participation
+
+💎 Earning Points:
+• Daily & hourly rewards (+5/15p)
+• Successful referrals (+75p)
+• Raid participation (+5p)
+• Special project contributions
+
+🤖 Bot Guide
+
+🌟 Community Features:
+• Point-based engagement system
+• Automated activity tracking
+• Multi-chain wallet support
+• Project participation tracking
+
+🎯 Community Raids:
+• Coordinated social actions
+• Automated verification
+• Instant point rewards
+• Performance tracking
+
+💎 Point System:
+• Time-based bonuses (5/15 points)
+• Referral rewards (75 per invite)
+• Raid participation (1-5 points)
+• Project completion rewards
+
+🏆 Leaderboard System:
+• Real-time rankings
+• Point history tracking
+• Achievement badges
+• Special role assignments
+
+🔐 Wallet Integration:
+• Secure wallet linking
+• Solana chain support
+• Airdrop eligibility
+• Project participation
+
+
+
+🎯 RAID IN PROGRESS
+━━━━━━━━━━━━━━━
+
+👤 Author:
+• {author_name} (@{author_username})
+
+📝 Content:
+{text}
+
+🖼 Media:
+• {media_url1}
+• {media_url2}
+...
+
+🔗 Link:
+{tweet_url}
+
+📊 Team Progress:
+• ❤️ Likes: {likes}
+• 🔁 Retweets: {retweets}
+• 💬 Replies: {replies}
+• 🔖 Bookmarks: {bookmarks}
+
+⏳ Time left: {minutes}m {seconds}s
+━━━━━━━━━━━━━━━
+
+
+
+👤 {USERNAME} profile:
+━━━━━━━━━━━━━━━
+
+🤝 Your referral link:
+{referralLink}
+
+🌟 Group Stats:
+{points} points & {invites} invites
+{messageCount} messages sent
+
+💳 Wallet:
+Connected: {walletAddress}
+— or —
+You haven't connected your wallet yet.
+
+
+
+🏆 Community Leaders
+━━━━━━━━━━━━━━━
+
+👑 @{username1} 💎 {points1} points
+
+🥈 @{username2} 💎 {points2} points
+
+💫 Keep engaging to climb the ranks!
+━━━━━━━━━━━━━━━
+
