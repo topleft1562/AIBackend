@@ -1,110 +1,90 @@
+
 📝 COMMAND HELP
 ━━━━━━━━━━━━━━━
-
 {command}
 
 📋 Info:
 • {description}
-• Use: {usage}
-• Ex: {example}
+• Usage: {usage}
+• Example: {example}
 
 ━━━━━━━━━━━━━━━
 
-🌟 Earn Points:
 
+
+
+🌟 EARN POINTS
 💬 Chat Activity:
-• +5 points hourly bonus
-• +15 points daily bonus
-• +0.1 points per min active
+• +5 pts/hour (active bonus)
+• +15 pts/day (daily bonus)
+• +0.1 pts/min active
 
 🤝 Community Growth:
-• +75 points per referral
-• (in development)
+• +75 pts per referral
+• (feature in development)
 
 🎯 Raid Participation:
-• ❤️ Like tweet (+1p)
-• 🔄 Retweet (+2p)
-• 💬 Reply (+3p)
-• 🔖 Bookmark (+2p)
+• ❤️ Like = +1 pt
+• 🔁 Retweet = +2 pts
+• 💬 Reply = +3 pts
+• 🔖 Bookmark = +2 pts
 
 🚀 Projects & Rewards:
 • Join community projects
-• Connect wallets for airdrops
-• Special event bonuses
+• Link wallets for airdrops
+• Watch for special bonuses
 
 
-🔧 Admin Commands
-
-📊 Community Management:
-/addgroup - Add a group to allowed list
-/removegroup - Remove a group from allowed list
-/raid - add a raid to the list.
-
-👤 User Commands
-/addMe - Add me to your group!
-/fatcat - View Main Menu!
-
+👤 USER COMMANDS
 🎯 Profile & Points:
-/profile - View your referral profile.
-/projects - View and interact with projects.
-/leaderboard - Check top community members.
-/top5 - View Top Projects using Fat Cat!
+• /addMe – Add yourself to group
+• /fatcat – Open main menu
+• /profile – View your profile
+• /projects – Explore projects
+• /leaderboard – Top users
+• /top5 – Top 5 projects
 
-🏆 Contests:
-/contest - View active contest and leaderboard.
 
-⚔️ Raids:
-/raids - View active raids in the group.
+🏆 Contests & Raids:
+• /contest – See current contest ( create a raid )
+• /raids – View active group raids
+• /raid – Add a new raid
 
-🌟 Projects:
-Use buttons in profile to:
-• View available projects
-• Join community initiatives
-• Track your participation
+🤖 BOT OVERVIEW
+🌟 Core Features:
+• Points for engagement & growth
+• Automated stat tracking
+• Wallet linking (Solana)
+• Project participation logs
 
-💎 Earning Points:
-• Daily & hourly rewards (+5/15p)
-• Successful referrals (+75p)
-• Raid participation (+5p)
-• Special project contributions
-
-🤖 Bot Guide
-
-🌟 Community Features:
-• Point-based engagement system
-• Automated activity tracking
-• Multi-chain wallet support
-• Project participation tracking
-
-🎯 Community Raids:
-• Coordinated social actions
-• Automated verification
+🎯 Raids:
+• Social task tracking
 • Instant point rewards
-• Performance tracking
+• Team progress view
 
-💎 Point System:
-• Time-based bonuses (5/15 points)
-• Referral rewards (75 per invite)
-• Raid participation (1-5 points)
-• Project completion rewards
-
-🏆 Leaderboard System:
-• Real-time rankings
-• Point history tracking
-• Achievement badges
-• Special role assignments
-
-🔐 Wallet Integration:
-• Secure wallet linking
-• Solana chain support
+💎 Points System:
+• Time bonuses (hourly/daily)
+• Referral boosts
+• Raid/task rewards
 • Airdrop eligibility
-• Project participation
+
+🏆 Leaderboards:
+• Live rankings
+• Score history
+• Badge support
+
+🔐 Wallets:
+• Secure linking
+• Track ownership
+• Unlock airdrops
+
+
+
 
 
 
 🎯 RAID IN PROGRESS
 ━━━━━━━━━━━━━━━
-
 👤 Author:
 • {author_name} (@{author_username})
 
@@ -114,46 +94,51 @@ Use buttons in profile to:
 🖼 Media:
 • {media_url1}
 • {media_url2}
-...
 
 🔗 Link:
 {tweet_url}
 
-📊 Team Progress:
-• ❤️ Likes: {likes}
-• 🔁 Retweets: {retweets}
-• 💬 Replies: {replies}
-• 🔖 Bookmarks: {bookmarks}
+📊 Progress:
+• ❤️ {likes} Likes
+• 🔁 {retweets} Retweets
+• 💬 {replies} Replies
+• 🔖 {bookmarks} Bookmarks
 
 ⏳ Time left: {minutes}m {seconds}s
 ━━━━━━━━━━━━━━━
 
 
 
-👤 {USERNAME} profile:
-━━━━━━━━━━━━━━━
 
-🤝 Your referral link:
+
+👤 USER PROFILE
+━━━━━━━━━━━━━━━
+👑 @{USERNAME}
+
+🤝 Referral Link:
 {referralLink}
 
-🌟 Group Stats:
-{points} points & {invites} invites
-{messageCount} messages sent
+📊 Group Stats:
+• {points} Points
+• {invites} Invites
+• {messageCount} Messages
 
 💳 Wallet:
 Connected: {walletAddress}
 — or —
-You haven't connected your wallet yet.
-
-
-
-🏆 Community Leaders
+You haven’t linked your wallet yet.
 ━━━━━━━━━━━━━━━
 
-👑 @{username1} 💎 {points1} points
 
-🥈 @{username2} 💎 {points2} points
 
-💫 Keep engaging to climb the ranks!
+
+
+
+🏆 COMMUNITY LEADERS
 ━━━━━━━━━━━━━━━
+🥇 @{username1} —💎 {points1} pts
+🥈 @{username2} —💎 {points2} pts
+🥉 @{username3} —💎 {points3} pts
 
+💫 Keep grinding. Be legendary.
+━━━━━━━━━━━━━━━
