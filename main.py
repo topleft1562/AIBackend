@@ -24,7 +24,6 @@ def chat_fatcat():
 """
     try:
         response = agent.chat(full_message)
-        console.log(response.response)
         return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
