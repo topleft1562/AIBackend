@@ -47,31 +47,41 @@ FunctionTool.from_defaults(
     description=(
         "Run a MongoDB-style query on any FATCAT collection.\n\n"
         "**Arguments:**\n"
-        "- `collection`: str — choose from: 'users', 'projects', 'raids', 'group_subs'\n"
+        "- `collection`: str — one of: 'users', 'projects', 'raids', 'group_subs'\n"
         "- `filter`: dict — optional Mongo-style filter\n"
-        "- `sort`: dict — optional sort order (e.g. { 'stats.totalPoints': -1 })\n"
-        "- `page`: int — pagination\n"
-        "- `limit`: int — max number of results (default 100)\n\n"
+        "- `sort`: dict — optional sort order (e.g. { 'groupPoints.<groupId>.points': -1 })\n"
+        "- `page`: int — pagination page number (default = 1)\n"
+        "- `limit`: int — max number of results to return (default = 100)\n\n"
         "**Examples:**\n"
-        "- Get coins with over 50 replies:\n  filter={ 'replies': { '$gt': 50 } }\n"
-        "- Projects with more than 200 points:\n  filter={ 'stats.totalPoints': { '$gte': 200 } }\n"
-        "- Scratch tickets after April:\n  filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } }\n"
-        "- Sort coins by lastPrice descending:\n  sort={ 'lastPrice': -1 }"
+        "- 🔍 Top users in a group:\n  "
+        "query_mongo('users', filter={ 'groupPoints.-100123.points': { '$gt': 0 } }, sort={ 'groupPoints.-100123.points': -1 }, limit=3)\n"
+        "- 📈 Active raids:\n  "
+        "query_mongo('raids', filter={ 'status': 'in_progress' })\n"
+        "- 📅 Raids created after April:\n  "
+        "query_mongo('raids', filter={ 'createdAt': { '$gte': '2025-04-01T00:00:00Z' } })\n"
+        "- 🧑‍💼 Projects with more than 50 members:\n  "
+        "query_mongo('projects', filter={ 'stats.memberCount': { '$gt': 50 } }, sort={ 'stats.memberCount': -1 })"
     )
 ),
+
 FunctionTool.from_defaults(
     fn=find_one_mongo,
     name="find_one_mongo",
     description=(
-        "Find a **single document** from any collection.\n\n"
+        "Find a **single document** from any FATCAT collection.\n\n"
         "**Arguments:**\n"
-        "- `collection`: str — e.g. 'solforge_users', 'coins', etc.\n"
-        "- `filter`: dict — Mongo-style match (e.g. { 'wallet': 'Abc123...' })\n\n"
+        "- `collection`: str — choose from: 'users', 'projects', 'raids', etc.\n"
+        "- `filter`: dict — Mongo-style match expression\n\n"
         "**Examples:**\n"
-        "- Find user by wallet:\n  filter={ 'wallet': 'ABC123...' }\n"
-        "- Find coin by name:\n  filter={ 'name': 'FORGE' }"
+        "- 🧑 Find user by Telegram ID:\n  "
+        "find_one_mongo('users', filter={ 'telegramId': 123456789 })\n"
+        "- 🔗 Find project by name:\n  "
+        "find_one_mongo('projects', filter={ 'name': 'FatCoin' })\n"
+        "- 🧾 Find a specific raid:\n  "
+        "find_one_mongo('raids', filter={ 'tweetUrl': 'https://x.com/fatcoin/status/123...' })"
     )
-)
+),
+
 
     ]
 
