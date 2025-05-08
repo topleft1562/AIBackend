@@ -1,88 +1,4 @@
 
-📝 COMMAND HELP
-━━━━━━━━━━━━━━━
-{command}
-
-📋 Info:
-• {description}
-• Usage: {usage}
-• Example: {example}
-
-━━━━━━━━━━━━━━━
-
-
-
-
-🌟 EARN POINTS
-💬 Chat Activity:
-• +5 pts/hour (active bonus)
-• +15 pts/day (daily bonus)
-• +0.1 pts/min active
-
-🤝 Community Growth:
-• +75 pts per referral
-• (feature in development)
-
-🎯 Raid Participation:
-• ❤️ Like = +1 pt
-• 🔁 Retweet = +2 pts
-• 💬 Reply = +3 pts
-• 🔖 Bookmark = +2 pts
-
-🚀 Projects & Rewards:
-• Join community projects
-• Link wallets for airdrops
-• Watch for special bonuses
-
-
-👤 USER COMMANDS
-🎯 Profile & Points:
-• /addMe – Add yourself to group
-• /fatcat – Open main menu
-• /profile – View your profile
-• /projects – Explore projects
-• /leaderboard – Top users
-• /top5 – Top 5 projects
-
-
-🏆 Contests & Raids:
-• /contest – See current contest ( create a raid )
-• /raids – View active group raids
-• /raid – Add a new raid
-
-🤖 BOT OVERVIEW
-🌟 Core Features:
-• Points for engagement & growth
-• Automated stat tracking
-• Wallet linking (Solana)
-• Project participation logs
-
-🎯 Raids:
-• Social task tracking
-• Instant point rewards
-• Team progress view
-
-💎 Points System:
-• Time bonuses (hourly/daily)
-• Referral boosts
-• Raid/task rewards
-• Airdrop eligibility
-
-🏆 Leaderboards:
-• Live rankings
-• Score history
-• Badge support
-
-🔐 Wallets:
-• Secure linking
-• Track ownership
-• Unlock airdrops
-
-
-
-
-
-
 🎯 RAID IN PROGRESS
 ━━━━━━━━━━━━━━━
 👤 Author:
@@ -134,7 +50,7 @@ You haven’t linked your wallet yet.
 
 
 
-🏆 COMMUNITY LEADERS
+🏆 GROUP LEADERBOARD
 ━━━━━━━━━━━━━━━
 🥇 @{username1} —💎 {points1} pts
 🥈 @{username2} —💎 {points2} pts
