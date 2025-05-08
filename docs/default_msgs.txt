@@ -1,4 +1,6 @@
 
+=== RAID_MESSAGE ===
+
 🎯 RAID IN PROGRESS
 ━━━━━━━━━━━━━━━
 👤 Author:
@@ -25,7 +27,7 @@
 
 
 
-
+=== USER_PROFILE ===
 
 👤 USER PROFILE
 ━━━━━━━━━━━━━━━
@@ -47,8 +49,7 @@ You haven’t linked your wallet yet.
 
 
 
-
-
+=== GROUP LEADERBOARD ===
 
 🏆 GROUP LEADERBOARD
 ━━━━━━━━━━━━━━━

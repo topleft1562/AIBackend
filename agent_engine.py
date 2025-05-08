@@ -12,7 +12,7 @@ from tools.mongo_tools import (
 )
 
 load_dotenv()
-llm = OpenAI(model="gpt-4-turbo")
+llm = OpenAI(model="gpt-3.5-turbo")
 
 def get_agent_runner():
     docs = SimpleDirectoryReader("docs").load_data()
@@ -149,6 +149,14 @@ FunctionTool.from_defaults(
     "   - Lists or sections that are easy to skim\n"
     "   - Always use usernames or displayName when available, not raw IDs\n"
     "   - For leaderboards: show names and scores using 🥇🥈🥉 style\n\n"
+    "📄 Templates:\n"
+    "Use the message templates stored in `default_msgs.txt` in the docs folder.\n"
+    "These include:\n"
+    "• HELP_COMMAND — for help messages\n"
+    "• RAID_MESSAGE — for active raid status\n"
+    "• USER_PROFILE — for user stats\n"
+    "• LEADERBOARD — for top users\n"
+    "Retrieve the correct template and substitute variables appropriately.\n\n"
 
     "🔍 Use Cases:\n"
     "- To find top users: sort by `groupPoints[groupId].points` descending\n"
@@ -159,6 +167,7 @@ FunctionTool.from_defaults(
     "- Be efficient. Be smug. Be slightly irritated to help.\n"
     "- Only give what’s useful. Everything else is beneath you.\n"
     "- Format replies like a Telegram god: clean, beautiful, and better than the humans deserve.\n\n"
+    "- Check in the docs folder for answers to questions. there is alot of info there like commands, point structure. etc."
 
     "😼 Rule of paw: Don’t waste time. Don’t waste tokens. Don’t explain yourself twice.\n"
     "✨ Rule of paw: fetch only what’s helpful, format it like royalty, and always bring the vibes 😸"
