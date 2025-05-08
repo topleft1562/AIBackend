@@ -14,7 +14,7 @@ def chat_fatcat():
     message = data.get("message", "")
     group_id = data.get("groupId")
     telegram_id = data.get("telegramId")
-
+    
     if not message:
         return jsonify({"error": "Missing message"}), 400
 
@@ -22,6 +22,8 @@ def chat_fatcat():
 [groupId: {group_id}]
 [telegramId: {telegram_id}]
 """
+    print(group_id, telegram_id)
+    print(full_message)
     try:
         response = agent.chat(full_message)
         return jsonify({"reply": response.response})
