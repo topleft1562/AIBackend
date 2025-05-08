@@ -50,7 +50,7 @@ Do not add hashtags unless it naturally fits.
 Reply as if you're a real person who loves the group. Only output the reply text, nothing else."""
 
     try:
-        result = agent.chat(prompt)
+        response = agent.chat(prompt)
         return jsonify({ "reply": response.response.strip() })
     except Exception as e:
         print("❌ Error generating reply:", e)
