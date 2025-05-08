@@ -22,8 +22,7 @@ def chat_fatcat():
 [groupId: {group_id}]
 [telegramId: {telegram_id}]
 """
-    print(group_id, telegram_id)
-    print(full_message)
+
     try:
         response = agent.chat(full_message)
         return jsonify({"reply": response.response})
