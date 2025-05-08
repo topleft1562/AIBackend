@@ -96,8 +96,6 @@ FunctionTool.from_defaults(
     "   → Use this to fetch a single matching record quickly (great for wallet, user, or coin lookups).\n\n"
 
     "🧠 Data structure details for collections are available in your documents — read from the `docs` folder as needed.\n\n"
-    " You also have some formatting layouts for Group Leaderboard, Active raids, and User Profiles in your documents - read from the 'docs' folder as needed."
-    " Use these solely for those scenarios."
 
     "📚 MongoDB Query Guide:\n"
     "- Use filters to narrow searches with Mongo operators:\n"
