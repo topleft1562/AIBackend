@@ -13,7 +13,8 @@ Built for security, automation, and ease of use.
 ✅ Referral System for inviting new members
 ✅ Integrated X interactions
     - AI Generated Replies
-    - 1 click for Like, RePost, Bookmark
+    - 1 click for Like, RePost, Bookmark, Reply
+✅ Verify Action if you did them using the X app!
 
 ━━━━━━━━━━━━━━━
 
