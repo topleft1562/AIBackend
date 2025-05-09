@@ -29,6 +29,7 @@ def chat():
         return jsonify({"error": str(e)}), 500
 
 
+# 🔹 Twitter reply generator (uses FatCat LLM)
 @app.route("/generate-twitter-reply", methods=["POST"])
 def generate_twitter_reply():
     data = request.json
@@ -49,8 +50,8 @@ Do not add hashtags unless it naturally fits.
 Reply as if you're a real person who loves the group. Only output the reply text, nothing else."""
 
     try:
-        result = agent.llm.chat(messages=[{"role": "user", "content": prompt}])
-        return jsonify({"reply": result.message.content.strip()})
+        response = agent.chat(prompt)
+        return jsonify({ "reply": response.response.strip() })
     except Exception as e:
         print("❌ Error generating reply:", e)
         return jsonify({"error": "Failed to generate Twitter reply"}), 500
