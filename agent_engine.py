@@ -9,6 +9,8 @@ from tools.token_tools import fetch_sol_price, get_token_price, get_token_addres
 from tools.mongo_tools import (
     find_one_mongo,
     query_mongo,
+    insert_game,
+    update_mongo
 )
 
 load_dotenv()
