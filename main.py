@@ -1,46 +1,23 @@
 import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner          # FatCat agent
-from tools.game_tools import handle_game_setup, pending_game_sessions, finalize_game
 
 app = Flask(__name__)
 
 # Initialize agents
 agent = get_agent_runner()
 
-
-
+# 🔹 FatCat endpoint
 @app.route("/chat", methods=["POST"])
 def chat_fatcat():
     data = request.json
-    message = data.get("message", "").strip()
+    message = data.get("message", "")
     group_id = data.get("groupId")
     telegram_id = data.get("telegramId")
-
+    
     if not message:
         return jsonify({"error": "Missing message"}), 400
 
-    message_lower = message.lower()
-
-    # 🎮 Game Setup Trigger
-    setup_phrases = ["create a game", "let's do a game", "game night", "make a game", "start a new game"]
-    if any(phrase in message_lower for phrase in setup_phrases):
-        reply = handle_game_setup(telegram_id, group_id, message)
-        return jsonify({ "reply": reply })
-
-    # ✅ Finalize game setup
-    finalize_phrases = ["start game", "begin game", "launch game"]
-    if any(phrase in message_lower for phrase in finalize_phrases):
-        reply = finalize_game(telegram_id)
-        return jsonify({ "reply": reply })
-
-    # 🔄 Continue setup only if this user started it
-    session = pending_game_sessions.get(telegram_id)
-    if session and session.get("hostTelegramId") == telegram_id:
-        reply = handle_game_setup(telegram_id, group_id, message)
-        return jsonify({ "reply": reply })
-
-    # 🤖 Default: Forward to FatCat LLM
     full_message = f"""{message}
 [groupId: {group_id}]
 [telegramId: {telegram_id}]
@@ -48,11 +25,9 @@ def chat_fatcat():
 
     try:
         response = agent.chat(full_message)
-        return jsonify({ "reply": response.response })
+        return jsonify({"reply": response.response})
     except Exception as e:
-        return jsonify({ "error": str(e) }), 500
-
-
+        return jsonify({"error": str(e)}), 500
 
 
 # 🔹 Twitter reply generator (uses FatCat LLM)
