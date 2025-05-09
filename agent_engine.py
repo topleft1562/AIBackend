@@ -88,36 +88,20 @@ FunctionTool.from_defaults(
     name="insert_game",
     description=(
         "Insert a new game session into the `games` collection.\n\n"
-        "**Arguments:**\n"
-        "- `document` (dict): All data related to the game configuration and tracking.\n\n"
-
-        "**Required Fields:**\n"
-        "- `groupId` (int): Telegram group ID where the game is played.\n"
-        "- `hostTelegramId` (int): Telegram ID of the user who started the game.\n"
-        "- `gameType` (str): Type of game (e.g. 'trivia', 'raffle', 'guess_the_price').\n"
-        "- `status` (str): Game status — one of: 'in_progress', 'completed', or 'cancelled'.\n"
-        "- `pointType` (str): Either 'ranking' or 'per_action'.\n"
-        "- `pointValues` (dict):\n"
-        "   → If `pointType` is 'ranking': e.g. { '1': 20, '2': 10, '3': 5 }\n"
-        "   → If `pointType` is 'per_action': e.g. { 'correctAnswer': 5, 'participation': 1 }\n"
-        "- `players` (dict): Keys are Telegram IDs, values include optional username, score, actions.\n"
-        "- `winners` (list): Optional — array of { telegramId, rank, points } entries (used after scoring).\n"
-        "- `createdAt` (ISODate): Timestamp of game creation.\n\n"
-
-        "**Example:**\n"
-        "insert_game({\n"
-        "  'groupId': -100123,\n"
-        "  'hostTelegramId': 123456789,\n"
-        "  'gameType': 'trivia',\n"
-        "  'status': 'in_progress',\n"
-        "  'pointType': 'ranking',\n"
-        "  'pointValues': { '1': 20, '2': 10, '3': 5 },\n"
-        "  'players': {},\n"
-        "  'winners': [],\n"
-        "  'createdAt': ISODate()\n"
-        "})"
+        "Required fields:\n"
+        "- `groupId` (int): Telegram group ID\n"
+        "- `hostTelegramId` (int): ID of the game creator\n"
+        "- `gameType` (str): Game type (e.g. 'trivia', 'raffle')\n"
+        "- `status` (str): 'in_progress', 'completed', or 'cancelled'\n"
+        "- `pointType` (str): 'ranking' or 'per_action'\n"
+        "- `pointValues` (dict): e.g. { '1': 20, '2': 10 } or { 'correctAnswer': 5 }\n"
+        "- `players` (dict): Optional — users and scores\n"
+        "- `winners` (list): Optional — final winners\n"
+        "- `createdAt` (ISODate): Game creation time\n\n"
+        "Example: insert_game({ 'groupId': -100123, 'hostTelegramId': 123456789, 'gameType': 'trivia', 'status': 'in_progress', 'pointType': 'ranking', 'pointValues': { '1': 20 }, 'players': {}, 'winners': [], 'createdAt': ISODate() })"
     )
 ),
+
 
 FunctionTool.from_defaults(
     fn=update_mongo,
