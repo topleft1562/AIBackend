@@ -34,8 +34,9 @@ def chat_fatcat():
         reply = finalize_game(telegram_id)
         return jsonify({ "reply": reply })
 
-    # 🔄 Continue game setup if in progress
-    if telegram_id in pending_game_sessions:
+    # 🔄 Continue setup only if this user started it
+    session = pending_game_sessions.get(telegram_id)
+    if session and session.get("hostTelegramId") == telegram_id:
         reply = handle_game_setup(telegram_id, group_id, message)
         return jsonify({ "reply": reply })
 
@@ -50,6 +51,7 @@ def chat_fatcat():
         return jsonify({ "reply": response.response })
     except Exception as e:
         return jsonify({ "error": str(e) }), 500
+
 
 
 
