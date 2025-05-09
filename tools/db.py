@@ -19,4 +19,5 @@ group_subs = db['groupSubscriptions']
 projects = db['projects']
 raids = db['raids']
 users = db['users']
+games = db['games']
 

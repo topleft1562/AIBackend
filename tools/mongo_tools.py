@@ -13,6 +13,7 @@ def query_mongo(
         "projects": projects,
         "raids": raids,
         "group_subs": group_subs,
+        "games": games,
 
     }
 
@@ -33,7 +34,8 @@ def find_one_mongo(collection: str, filter: dict):
         "users": users,
         "projects": projects,
         "raids": raids,
-        "group_subs": group_subs
+        "group_subs": group_subs,
+        "games": games,
     }
 
     if collection not in db_map:
@@ -44,3 +46,21 @@ def find_one_mongo(collection: str, filter: dict):
         return result or f"❌ No result found with filter: {filter}"
     except Exception as e:
         return f"❌ Mongo find_one failed: {str(e)}"
+
+def insert_game(document: dict) -> dict:
+    try:
+        result = db["games"].insert_one(document)
+        return { "inserted_id": str(result.inserted_id) }
+    except Exception as e:
+        return { "error": str(e) }
+
+def update_mongo(collection: str, filter: dict, update: dict) -> dict:
+    try:
+        col = db[collection]
+        result = col.update_one(filter, { "$set": update })
+        return {
+            "matched": result.matched_count,
+            "modified": result.modified_count
+        }
+    except Exception as e:
+        return { "error": str(e) }

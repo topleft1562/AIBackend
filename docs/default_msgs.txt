@@ -49,7 +49,7 @@ You haven’t linked your wallet yet.
 
 
 
-=== GROUP LEADERBOARD ===
+=== GROUP_LEADERBOARD ===
 
 🏆 GROUP LEADERBOARD
 ━━━━━━━━━━━━━━━
