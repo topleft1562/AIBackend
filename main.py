@@ -2,6 +2,9 @@ import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner          # FatCat agent
 from datetime import datetime
+from tools.game_tools import (
+    handle_game_setup
+)
 
 pending_game_sessions = {}
 app = Flask(__name__)
