@@ -1,5 +1,8 @@
 from tools.mongo_tools import insert_game
 
+# In-memory setup tracking
+pending_game_sessions = {}
+
 def finalize_game(telegram_id):
     session = pending_game_sessions.get(telegram_id)
     if not session or session.get("step") != "done":
@@ -73,4 +76,6 @@ def handle_game_setup(telegram_id, group_id, message_text):
         session["status"] = "in_progress"
         session["step"] = "done"
 
-        return "🎉 All set! Say `/startgame` to begin or add players manually."
+        return "🎉 All set! Say `/fatty startgame` to begin."
+
+__all__ = ["handle_game_setup", "finalize_game", "pending_game_sessions"]

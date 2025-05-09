@@ -2,20 +2,15 @@ import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner          # FatCat agent
 from datetime import datetime
-from tools.game_tools import (
-    handle_game_setup
-)
+from tools.game_tools import handle_game_setup, pending_game_sessions
 
-pending_game_sessions = {}
 app = Flask(__name__)
 
 # Initialize agents
 agent = get_agent_runner()
 
-# In-memory setup tracking
-pending_game_sessions = {}
 
-# 🔹 FatCat endpoint with game trigger
+
 @app.route("/chat", methods=["POST"])
 def chat_fatcat():
     data = request.json
@@ -26,18 +21,26 @@ def chat_fatcat():
     if not message:
         return jsonify({"error": "Missing message"}), 400
 
-    # 🧠 Game Setup Trigger
-    trigger_phrases = ["start game", "let's do a game", "game night"]
-    if any(phrase in message.lower() for phrase in trigger_phrases):
+    message_lower = message.lower()
+
+    # 🎮 Game Setup Trigger
+    setup_phrases = ["create a game", "let's do a game", "game night", "make a game", "start a new game"]
+    if any(phrase in message_lower for phrase in setup_phrases):
         reply = handle_game_setup(telegram_id, group_id, message)
         return jsonify({ "reply": reply })
 
-    # 🧩 Continue game setup if in progress
+    # ✅ Finalize game setup
+    finalize_phrases = ["start game", "begin game", "launch game"]
+    if any(phrase in message_lower for phrase in finalize_phrases):
+        reply = finalize_game(telegram_id)
+        return jsonify({ "reply": reply })
+
+    # 🔄 Continue game setup if in progress
     if telegram_id in pending_game_sessions:
         reply = handle_game_setup(telegram_id, group_id, message)
         return jsonify({ "reply": reply })
 
-    # 🤖 Default: Send to FatCat AI
+    # 🤖 Default: Forward to FatCat LLM
     full_message = f"""{message}
 [groupId: {group_id}]
 [telegramId: {telegram_id}]
