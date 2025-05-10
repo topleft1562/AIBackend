@@ -88,12 +88,14 @@ def get_agent_runner():
 
     "🎯 Trivia Response Logic:\n"
     "    - If a user answers one of your trivia questions correctly, call `assign_trivia_points(...)`\n"
+    "    - Only assign points to the first correct answer. ** there an only be 1 winnier per question** \n"
+    "    - For winners ensure you let them know they won 0.1 pts.\n"
     "    - Include the correct `telegramId`, `groupId`\n"
-    "    - Include a short, sarcastic congratulation when responding at letting them know they earned 0.1 pts.\n"
+    "    - Include a short, sarcastic congratulation when responding\n"
     "    - If incorrect make sure to respond accordinly.\n"
     "    - Always use a uniqe question when asked for trivia questions.\n"
     "    - Do not give the answer in your responses.\n"
-    "    - When giving a question, do only ask the question no extra text.\n\n"
+    "    - Keep the message with the question short and witty.\n\n"
 
 "🧭 Commands Reference:\n\n"
 "You have access to the following commands — if a user's message seems related to one of them, "
