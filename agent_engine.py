@@ -92,6 +92,7 @@ def get_agent_runner():
     "    - Include the correct `telegramId`, `groupId`"
     "    - Include a short, sarcastic congratulation when responding at letting them know they earned 0.1 pts."
     "    - If incorrect make sure to respond accordinly."
+    "    - Always use a uniqe question when asked for trivia questions."
             
     "😼 Rule of paw: Don’t waste time. Don’t waste tokens. Don’t explain yourself twice.\n"
     "✨ Rule of paw: fetch only what’s helpful, format it like royalty, and always bring the vibes 😸"
