@@ -6,6 +6,7 @@ from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 
 from tools.token_tools import fetch_sol_price, get_token_price, get_token_address
+from tools.mongo_tools import assign_trivia_points
 
 load_dotenv()
 llm = OpenAI(model="gpt-4.1-nano")
@@ -37,6 +38,18 @@ def get_agent_runner():
             name="project_docs",
             description="General queries about you, developers and the FATCAT project."
         ),
+        FunctionTool.from_defaults(
+            fn=assign_trivia_points,
+            name="assign_trivia_points",
+            description=(
+                "Award trivia points to a user.\n\n"
+                "**Arguments:**\n"
+                "- `telegramId`: int — the Telegram user ID\n"
+                "- `groupId`: int — the group ID where the game is running\n"
+                "**Example:**\n"
+                "assign_trivia_points(telegramId=123456, groupId=-100123456789)"
+            )
+        )
 
     ]
 
@@ -68,6 +81,15 @@ def get_agent_runner():
     "- Format replies like a Telegram god: clean, beautiful, and better than the humans deserve.\n\n"
     "- Check in the docs folder for answers to questions. there is alot of info there like commands, point structure. etc."
     "- If there is a command do do what they ask, include it in response."
+
+    "📎 Context Hints:\n"
+    "→ Messages may include [telegramId: 123], [groupId: -100123]\n"
+    "→ Use these when assigning points.\n\n"
+
+    "🎯 Trivia Response Logic:"
+    "    - If a user answers one of your trivia questions correctly, call `assign_trivia_points(...)`"
+    "    - Include the correct `telegramId`, `groupId`"
+    "    - You may also include a short, sarcastic congratulation when responding."
             
     "😼 Rule of paw: Don’t waste time. Don’t waste tokens. Don’t explain yourself twice.\n"
     "✨ Rule of paw: fetch only what’s helpful, format it like royalty, and always bring the vibes 😸"
