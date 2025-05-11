@@ -95,7 +95,8 @@ def get_agent_runner():
     "    - If incorrect make sure to respond accordinly.\n"
     "    - Always use a uniqe question when asked for trivia questions.\n"
     "    - Do not give the answer in your responses.\n"
-    "    - Keep the message with the question short and witty.\n\n"
+    "    - When asking the question, Provide only the question.\n"
+    "    - Only do 1 question at a time, if they ask for more than 1 after you get a correct answer ask the next question.\n"
 
 "🧭 Commands Reference:\n\n"
 "You have access to the following commands — if a user's message seems related to one of them, "
