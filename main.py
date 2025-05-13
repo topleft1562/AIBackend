@@ -35,27 +35,32 @@ def chat_fatcat():
 def generate_twitter_reply():
     data = request.json
     group = data.get("groupName")
-    examples = data.get("examples")
 
-    if not group or not examples or not isinstance(examples, list):
-        return jsonify({"error": "Missing or invalid fields: groupName, examples[]"}), 400
+    if not group:
+        return jsonify({"error": "Missing groupName"}), 400
 
-    prompt = f"""You are helping to write a quick Twitter reply about the group "{group}". 
-Here are some examples of the style we're aiming for:
+    prompt = f"""
+You are helping create a hype Twitter reply about the project "{group}".
 
-{chr(10).join([f'{i+1}. "{ex}"' for i, ex in enumerate(examples)])}
+✏️ Style: Short, punchy, first-person tone. Excited, bold, but casual. Imagine you're a real community member hyping up the token.
 
-Now, based on the examples above, write **one** short, friendly, punchy Twitter reply about "{group}". 
-Keep it under 100 characters. 
-Do not add hashtags unless it naturally fits.
-Reply as if you're a real person who loves the group. Only output the reply text, nothing else."""
+⚠️ Constraints:
+- Keep it under 100 characters.
+- Don't reuse phrasing from prior responses.
+- Avoid hashtags unless they fit naturally.
+- Don’t start with the project name.
+- Do not return examples or quotes — return just the final tweet text.
+
+🔥 Generate a completely unique tweet reply.
+"""
 
     try:
         response = agent.chat(prompt)
-        return jsonify({ "reply": response.response.strip() })
+        return jsonify({"reply": response.response.strip()})
     except Exception as e:
         print("❌ Error generating reply:", e)
         return jsonify({"error": "Failed to generate Twitter reply"}), 500
+
 
 # 🔹 Start the Flask server
 if __name__ == "__main__":
