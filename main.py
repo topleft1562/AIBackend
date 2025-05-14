@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
 from collections import defaultdict, deque
-import threading
+from threading import Lock
 
 app = Flask(__name__)
 
