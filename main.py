@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
 from collections import defaultdict, deque
-from threading import Lock
+import threading
 
 app = Flask(__name__)
 
@@ -48,41 +48,44 @@ def generate_twitter_reply():
     lock = locks_by_group[group]
     with lock:
         recent = recent_replies_by_group[group]
+        recent_list = list(recent)[-5:]  # Only last 5 for uniqueness
+        norm_recent = set(r.lower().strip() for r in recent_list)
 
-        def normalize(text):
-            return ''.join(c.lower() for c in text if c.isalnum())
+        # Prompt construction
+        context = "\n".join([f"- {r}" for r in recent_list]) if recent_list else "None"
+        prompt = f"""
+You're crafting short Twitter replies to hype the crypto project "{group}".
 
-        norm_recent = set(normalize(r) for r in recent)
-
-        for attempt in range(MAX_ATTEMPTS):
-            prompt = f"""
-You are writing a fun, punchy tweet reply about the crypto project "{group}".
+🧠 Last 5 replies to avoid:
+{context}
 
 ✏️ Style:
-- Short, bold, and casual
-- First-person voice
-- Max 100 characters
-- No hashtags unless they fit naturally
+- First-person, fun, bold, excited
+- Max 100 characters each
+- No hashtags unless natural
 - Don’t start with the project name
 
-🔥 Generate a completely unique tweet reply.
-
-Reply with **only** the final tweet text. It should feel fresh and authentic.
+⚡️ Task:
+Generate 5 completely fresh replies, each on a new line. No bullets. No quotes. Just 5 tweet-ready lines.
 """
 
-            try:
-                response = agent.chat(prompt).response.strip()
-                norm_reply = normalize(response)
+        try:
+            response = agent.chat(prompt).response.strip()
+            replies = [r.strip() for r in response.split("\n") if r.strip()]
 
-                if norm_reply not in norm_recent:
-                    recent.append(response)
-                    return jsonify({"reply": response})
-            except Exception as e:
-                print("❌ Error generating reply:", e)
-                return jsonify({"error": "Failed to generate Twitter reply"}), 500
+            for reply in replies:
+                if reply.lower() not in norm_recent:
+                    recent.append(reply)
+                    return jsonify({"reply": reply})
 
-        return jsonify({"error": "Failed to generate a unique reply after multiple tries"}), 409
+            # If all are duplicates, pick the first anyway
+            fallback = replies[0] if replies else "No unique reply found."
+            recent.append(fallback)
+            return jsonify({"reply": fallback})
 
+        except Exception as e:
+            print("❌ Error generating replies:", e)
+            return jsonify({"error": "Failed to generate Twitter reply"}), 500
 
 
 # 🔹 Start the Flask server
