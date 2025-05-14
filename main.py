@@ -1,15 +1,19 @@
 import os
 from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
-from collections import deque
-
+from collections import defaultdict, deque
+from threading import Lock
 
 app = Flask(__name__)
 
 # Initialize agents
 agent = get_agent_runner()
-recent_replies = deque(maxlen=100)
 
+# Track last replies per group
+recent_replies_by_group = defaultdict(lambda: deque(maxlen=100))
+locks_by_group = defaultdict(Lock)
+
+MAX_ATTEMPTS = 3
 
 # 🔹 FatCat endpoint
 @app.route("/chat", methods=["POST"])
@@ -41,10 +45,18 @@ def generate_twitter_reply():
     if not group:
         return jsonify({"error": "Missing groupName"}), 400
 
-    recent_section = "\n".join([f"- {r}" for r in recent_replies])
-    
-    prompt = f"""
-You are helping write a hype tweet reply about the project "{group}".
+    lock = locks_by_group[group]
+    with lock:
+        recent = recent_replies_by_group[group]
+
+        def normalize(text):
+            return ''.join(c.lower() for c in text if c.isalnum())
+
+        norm_recent = set(normalize(r) for r in recent)
+
+        for attempt in range(MAX_ATTEMPTS):
+            prompt = f"""
+You are writing a fun, punchy tweet reply about the crypto project "{group}".
 
 ✏️ Style:
 - Short, bold, and casual
@@ -55,23 +67,22 @@ You are helping write a hype tweet reply about the project "{group}".
 
 🔥 Generate a completely unique tweet reply.
 
-❌ Do NOT reuse or closely mimic any of these previous replies:
-{recent_section}
-
-✅ Only return the final tweet text, nothing else. Keep it fresh, fun, and different.
+Reply with **only** the final tweet text. It should feel fresh and authentic.
 """
 
-    try:
-        response = agent.chat(prompt)
-        reply = response.response.strip()
-        
-        if reply and reply not in recent_replies:
-            recent_replies.append(reply)
-        
-        return jsonify({ "reply": reply })
-    except Exception as e:
-        print("❌ Error generating reply:", e)
-        return jsonify({"error": "Failed to generate Twitter reply"}), 500
+            try:
+                response = agent.chat(prompt).response.strip()
+                norm_reply = normalize(response)
+
+                if norm_reply not in norm_recent:
+                    recent.append(response)
+                    return jsonify({"reply": response})
+            except Exception as e:
+                print("❌ Error generating reply:", e)
+                return jsonify({"error": "Failed to generate Twitter reply"}), 500
+
+        return jsonify({"error": "Failed to generate a unique reply after multiple tries"}), 409
+
 
 
 # 🔹 Start the Flask server
