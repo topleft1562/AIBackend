@@ -54,7 +54,7 @@ def generate_twitter_reply():
         recent_list = list(recent)[-5:]  # Only last 5 for uniqueness
         norm_recent = set(r.lower().strip() for r in recent_list)
 
-       example_context = "\n".join([f"- {r.replace('{groupName}', group)}" for r in get_random_examples()])
+        example_context = "\n".join([f"- {r.replace('{groupName}', group)}" for r in get_random_examples()])
 
         prompt = f"""
 You're crafting short Twitter replies to hype the crypto project "{group}".
