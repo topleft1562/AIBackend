@@ -3,6 +3,8 @@ from flask import Flask, request, jsonify
 from agent_engine import get_agent_runner
 from collections import defaultdict, deque
 from threading import Lock
+from tools.reply_example_loader import get_random_examples
+
 
 app = Flask(__name__)
 
@@ -36,6 +38,7 @@ def chat_fatcat():
         return jsonify({"reply": response.response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
 
 @app.route("/generate-twitter-reply", methods=["POST"])
 def generate_twitter_reply():
@@ -51,13 +54,16 @@ def generate_twitter_reply():
         recent_list = list(recent)[-5:]  # Only last 5 for uniqueness
         norm_recent = set(r.lower().strip() for r in recent_list)
 
-        # Prompt construction
-        context = "\n".join([f"- {r}" for r in recent_list]) if recent_list else "None"
+        example_context = "\n".join([f"- {r}" for r in get_random_examples()])
+
         prompt = f"""
 You're crafting short Twitter replies to hype the crypto project "{group}".
 
-🧠 Last 5 replies to avoid:
-{context}
+🧠 Recent replies to avoid:
+{chr(10).join([f"- {r}" for r in recent_list]) if recent_list else "None"}
+
+📦 Example replies for inspiration:
+{example_context}
 
 ✏️ Style:
 - First-person, fun, bold, excited
@@ -78,7 +84,6 @@ Generate 5 completely fresh replies, each on a new line. No bullets. No quotes. 
                     recent.append(reply)
                     return jsonify({"reply": reply})
 
-            # If all are duplicates, pick the first anyway
             fallback = replies[0] if replies else "No unique reply found."
             recent.append(fallback)
             return jsonify({"reply": fallback})
