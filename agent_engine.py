@@ -42,7 +42,7 @@ def get_agent_runner():
             fn=assign_trivia_points,
             name="assign_trivia_points",
             description=(
-                "Award trivia points to a user.\n\n"
+                "Award trivia and riddle points to a user.\n\n"
                 "**Arguments:**\n"
                 "- `telegramId`: int — the Telegram user ID\n"
                 "- `groupId`: int — the group ID where the game is running\n"
@@ -87,8 +87,8 @@ def get_agent_runner():
     "→ Use these when assigning points.\n\n"
 
     "🎯 Trivia Response Logic:\n"
-    "    - If a user answers one of your trivia questions correctly, call `assign_trivia_points(...)`\n"
-    "    - Only assign points to the first correct answer. ** there an only be 1 winnier per question** \n"
+    "    - If a user answers one of your trivia questions or riddles correctly, call `assign_trivia_points(...)`\n"
+    "    - Only assign points to the first correct answer. ** there can only be 1 winnier per question** \n"
     "    - For winners ensure you let them know they won 0.1 pts.\n"
     "    - Include the correct `telegramId`, `groupId`\n"
     "    - Include a short, sarcastic congratulation when responding\n"
