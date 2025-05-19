@@ -73,20 +73,32 @@ You're crafting short Twitter replies to hype the crypto project "{group}".
 
 ⚡️ Task:
 Generate 5 completely fresh replies, each on a new line. No bullets. No quotes. Just 5 tweet-ready lines.
+
+❗ Important:
+Do not copy or rewrite the inspiration examples. They are just style guides.
+All 5 lines must be completely original and fresh.
+
 """
 
         try:
             response = agent.chat(prompt).response.strip()
             replies = [r.strip() for r in response.split("\n") if r.strip()]
 
-            for reply in replies:
-                if reply.lower() not in norm_recent:
-                    recent.append(reply)
-                    return jsonify({"reply": reply})
+            # Normalize for comparison
+            norm_recent = set(r.lower().strip() for r in recent_list)
+            norm_examples = set(r.lower().strip().replace("{groupName}", group) for r in ALL_EXAMPLES)
 
+            # Prefer new and unique replies
+            for reply in replies:
+                norm = reply.lower().strip()
+                if norm not in norm_recent and norm not in norm_examples:
+                    recent.append(reply)
+                    return jsonify({ "reply": reply })
+
+            # If everything was a dupe, return the first anyway
             fallback = replies[0] if replies else "No unique reply found."
             recent.append(fallback)
-            return jsonify({"reply": fallback})
+            return jsonify({ "reply": fallback })
 
         except Exception as e:
             print("❌ Error generating replies:", e)

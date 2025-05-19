@@ -1,7 +1,5 @@
 import random
 
-import random
-
 ALL_EXAMPLES = [
         "I don’t chase green candles. I ride {groupName}.",
     "It’s not luck. It’s {groupName}.",
