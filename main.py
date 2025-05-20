@@ -4,7 +4,7 @@ from agent_engine import get_agent_runner
 from collections import defaultdict, deque
 from threading import Lock
 from tools.reply_example_loader import get_random_examples, ALL_EXAMPLES
-
+import random
 
 app = Flask(__name__)
 
