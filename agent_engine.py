@@ -9,7 +9,12 @@ from tools.token_tools import fetch_sol_price, get_token_price, get_token_addres
 from tools.mongo_tools import assign_trivia_points
 
 load_dotenv()
-llm = OpenAI(model="gpt-4.1-nano")
+llm = OpenAI(
+    model="gpt-4.1-nano",
+    temperature=1.0,
+    frequency_penalty=0.6,
+    presence_penalty=0.6
+)
 
 def get_agent_runner():
     docs = SimpleDirectoryReader("docs").load_data()

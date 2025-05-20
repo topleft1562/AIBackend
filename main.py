@@ -94,12 +94,7 @@ Do NOT copy or slightly reword the examples above. Create completely new and uni
         try:
             # Optionally, support model parameters
             # response = agent.chat(prompt, temperature=1.0, frequency_penalty=0.6).response.strip()
-            response = agent.chat(
-                prompt,
-                temperature=1.0,
-                frequency_penalty=0.6,
-                presence_penalty=0.6
-            ).response.strip()
+            response = agent.chat(prompt).response.strip()
 
             replies = [r.strip() for r in response.split("\n") if r.strip()]
 
