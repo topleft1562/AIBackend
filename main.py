@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 from threading import Lock
 from tools.reply_example_loader import get_random_examples, ALL_EXAMPLES
 import random
+import uuid
 
 app = Flask(__name__)
 
@@ -45,6 +46,8 @@ def generate_twitter_reply():
     data = request.json
     group = data.get("groupName")
     telegram_id = data.get("telegramId") or random.randint(1, 999999)
+    random_entropy = str(uuid.uuid4())[:8]
+    unique_id = f"{telegram_id}-{random_entropy}"
 
     if not group:
         return jsonify({"error": "Missing groupName"}), 400
@@ -64,6 +67,9 @@ def generate_twitter_reply():
 
         prompt = f"""
 You are generating short Twitter replies to hype the crypto project "{group}".
+
+🧬 Request ID: {unique_id}
+(Note: Do NOT include this ID in your output. It's just for uniqueness.)
 UserID: {telegram_id}  # Do NOT mention this in the reply. It's just for entropy.
 
 🧠 Recent replies to avoid:
