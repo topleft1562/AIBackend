@@ -183,5 +183,5 @@ ALL_EXAMPLES = [
     "It’s time. {groupName}.",
 ]
 
-def get_random_examples(n=20):
+def get_random_examples(n=5):
     return random.sample(ALL_EXAMPLES, min(n, len(ALL_EXAMPLES)))

@@ -13,7 +13,7 @@ app = Flask(__name__)
 agent = get_agent_runner()
 
 # Track last replies per group
-recent_replies_by_group = defaultdict(lambda: deque(maxlen=100))
+recent_replies_by_group = defaultdict(lambda: deque(maxlen=20))
 locks_by_group = defaultdict(Lock)
 
 MAX_ATTEMPTS = 3
