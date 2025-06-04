@@ -37,6 +37,7 @@ def chat_fatcat():
 def generate_twitter_reply():
     data = request.json
     group = data.get("groupName")
+    telegramId = data.get("telegramId")
     if not group:
         return jsonify({"error": "Missing groupName"}), 400
 
@@ -47,6 +48,9 @@ You are generating short Twitter replies to hype the crypto project "{group}".
 
 🧬 Entropy ID: {entropy_seed}
 Use this as creative randomness. Do NOT include it in the replies.
+
+🔒 Telegram USER ID: {telegramId}
+This is the users Telegram Id, use this for uniqueness. Do NOT include it in the replies.
 
 🎯 Style:
 - First-person, fun, chaotic, bold
