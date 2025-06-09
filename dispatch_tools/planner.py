@@ -11,6 +11,7 @@ geolocator = Nominatim(user_agent="dispatch_planner")
 KM_PER_HOUR = 80
 LOAD_UNLOAD_HOURS = 1.5  # For both pickup and dropoff
 MAX_HOURS = 70  # Canadian DOT 70-hour limit
+WARNING_HOURS = 55  # Above this counts as overtime
 
 location_cache = {}
 
@@ -43,45 +44,56 @@ def generate_simple_dispatch_plan(drivers: List[Dict], loads: List[Dict]) -> str
         return "No loads provided."
 
     plan = []
-    load_index = 0
+    assignments = [
+        {
+            "driver": driver,
+            "start_location": driver.get("location", "Unknown"),
+            "current_location": driver.get("location", "Unknown"),
+            "name": driver.get("name", "Unnamed"),
+            "assigned": [],
+            "loaded_km": 0,
+            "empty_km": 0,
+            "hours": 0
+        } for driver in drivers
+    ]
 
-    for i, driver in enumerate(drivers):
-        name = driver.get("name", f"Driver {i+1}")
-        location = driver.get("location", "Unknown")
-        start_location = location
-        assigned = []
-        total_loaded_km = 0
-        total_empty_km = 0
-        total_hours = 0
+    for load in loads:
+        best_choice = None
+        lowest_overtime = float("inf")
 
-        while load_index < len(loads):
-            load = loads[load_index]
-            km_empty, hours_empty = estimate_drive_hours(location, load['pickupCity'])
-            km_loaded, hours_loaded = estimate_drive_hours(load['pickupCity'], load['dropoffCity'])
+        for assignment in assignments:
+            if assignment["hours"] >= MAX_HOURS:
+                continue
 
-            projected_hours = total_hours + hours_empty + hours_loaded
+            empty_km, empty_hours = estimate_drive_hours(assignment["current_location"], load['pickupCity'])
+            loaded_km, loaded_hours = estimate_drive_hours(load['pickupCity'], load['dropoffCity'])
+            projected_hours = assignment["hours"] + empty_hours + loaded_hours
 
-            if projected_hours > MAX_HOURS:
-                break
+            overtime = max(projected_hours - WARNING_HOURS, 0)
 
-            total_empty_km += km_empty
-            total_loaded_km += km_loaded
-            total_hours += hours_empty + hours_loaded
+            if projected_hours <= MAX_HOURS and overtime < lowest_overtime:
+                best_choice = assignment
+                lowest_overtime = overtime
 
-            assigned.append(f"{load['pickupCity']} → {load['dropoffCity']}")
-            location = load['dropoffCity']
-            load_index += 1
+        if best_choice:
+            best_choice["empty_km"] += empty_km
+            best_choice["loaded_km"] += loaded_km
+            best_choice["hours"] += empty_hours + loaded_hours
+            best_choice["current_location"] = load['dropoffCity']
+            best_choice["assigned"].append(f"{load['pickupCity']} → {load['dropoffCity']}")
 
-        total_km = total_empty_km + total_loaded_km
-        loaded_pct = round(100 * total_loaded_km / total_km) if total_km > 0 else 0
+    for assignment in assignments:
+        total_km = assignment["loaded_km"] + assignment["empty_km"]
+        loaded_pct = round(100 * assignment["loaded_km"] / total_km) if total_km > 0 else 0
+        hos_used = round(100 * assignment["hours"] / MAX_HOURS)
 
-        if assigned:
+        if assignment["assigned"]:
             plan.append(
-                f"• {name} ({start_location}): {' → '.join(assigned)} "
-                f"(Total: {int(total_km)}km — {int(total_loaded_km)} loaded / {int(total_empty_km)} empty, "
-                f"{round(total_hours, 1)}h, {loaded_pct}% loaded, {round(100 * total_hours / MAX_HOURS)}% of HOS used)"
+                f"• {assignment['name']} ({assignment['start_location']}): {' → '.join(assignment['assigned'])} "
+                f"(Total: {int(total_km)}km — {int(assignment['loaded_km'])} loaded / {int(assignment['empty_km'])} empty, "
+                f"{round(assignment['hours'], 1)}h, {loaded_pct}% loaded, {hos_used}% of HOS used)"
             )
         else:
-            plan.append(f"• {name} ({location}): No loads assigned (idle/reset)")
+            plan.append(f"• {assignment['name']} ({assignment['start_location']}): No loads assigned (idle/reset)")
 
     return "\n".join(plan)
