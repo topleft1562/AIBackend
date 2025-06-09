@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.tools import FunctionTool
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
@@ -13,8 +12,7 @@ llm = OpenAI(
 )
 
 def get_agent_runner():
-    docs = SimpleDirectoryReader("docs").load_data()
-    index = VectorStoreIndex.from_documents(docs)
+   
 
     tools = [
         FunctionTool.from_defaults(
