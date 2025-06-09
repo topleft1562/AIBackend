@@ -27,9 +27,11 @@ def handle_dispatch():
 
     try:
         formatted_message = (
-            f"Create an optimized dispatch plan for the following loads:\n\n"
-            f"Loads:\n{loads}\n\n"
-            f"All drivers start and end at: {base_location}"
+            f"You are a logistics planner. Assign the following loads to the minimum number of drivers.\n"
+            f"Each driver starts and ends at {base_location}.\n"
+            f"Try to aim for 55 hours per driver, but never exceed 70 hours.\n"
+            f"Optimize routes to group loads logically and reduce backtracking.\n\n"
+            f"Loads:\n{loads}"
         )
 
         response = agent.chat(formatted_message)
