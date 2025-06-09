@@ -3,39 +3,33 @@ import requests
 from flask import Flask, request, jsonify, render_template_string
 from urllib.parse import unquote
 from agent_engine import get_agent_runner
-import time
 
 app = Flask(__name__)
 
 # Initialize Dispatchy agent
 agent = get_agent_runner()
 
-# Google Distance Matrix API function
+# Google Distance Matrix API key
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 
+# Cached distance dictionary
+DISTANCE_CACHE = {}
 
-
-def get_distance_km_google(origin, destination, retries=3, delay=2):
+# Helper function to batch fetch distances from Google API
+def fetch_distance_matrix(origins, destinations):
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
-        "origins": origin,
-        "destinations": destination,
+        "origins": "|".join(origins),
+        "destinations": "|".join(destinations),
         "key": GOOGLE_KEY,
         "units": "metric"
     }
-
-    for attempt in range(retries):
-        try:
-            res = requests.get(url, params=params, timeout=10)
-            data = res.json()
-            if data["rows"] and data["rows"][0]["elements"][0]["status"] == "OK":
-                return round(data["rows"][0]["elements"][0]["distance"]["value"] / 1000, 1)
-        except Exception as e:
-            print(f"Distance matrix error ({attempt + 1}/{retries}): {e}")
-            time.sleep(delay)
-
-    return None  # fallback on failure
-
+    try:
+        res = requests.get(url, params=params)
+        data = res.json()
+        return data
+    except:
+        return None
 
 @app.route("/dispatch", methods=["GET", "POST"])
 def handle_dispatch():
@@ -55,20 +49,47 @@ def handle_dispatch():
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        # Add distance metadata to each load
+        # Prepare all unique city pairs for distance lookup
+        unique_pairs = set()
+        base = base_location.replace(" ", "")
+        for load in loads:
+            pickup = load["pickupCity"].replace(" ", "")
+            dropoff = load["dropoffCity"].replace(" ", "")
+            unique_pairs.add((base, pickup))
+            unique_pairs.add((pickup, dropoff))
+            if dropoff != base:
+                unique_pairs.add((dropoff, base))
+
+        # Fetch missing distances in batches
+        origins = []
+        destinations = []
+        for (orig, dest) in unique_pairs:
+            if (orig, dest) not in DISTANCE_CACHE:
+                origins.append(orig)
+                destinations.append(dest)
+
+        if origins and destinations:
+            distance_data = fetch_distance_matrix(origins, destinations)
+            if distance_data and distance_data.get("rows"):
+                for i, row in enumerate(distance_data["rows"]):
+                    for j, element in enumerate(row["elements"]):
+                        if element["status"] == "OK":
+                            dist_km = round(element["distance"]["value"] / 1000, 1)
+                            DISTANCE_CACHE[(origins[i], destinations[j])] = dist_km
+
+        # Enrich loads with distances
         enriched_loads = []
         for load in loads:
             pickup = load["pickupCity"].replace(" ", "")
             dropoff = load["dropoffCity"].replace(" ", "")
-            base = base_location.replace(" ", "")
 
-            empty_to_pickup_km = get_distance_km_google(base, pickup)
-            loaded_km = get_distance_km_google(pickup, dropoff)
-            return_empty_km = get_distance_km_google(dropoff, base) if dropoff != base else 0
+            empty_to_pickup_km = DISTANCE_CACHE.get((base, pickup), 0)
+            loaded_km = DISTANCE_CACHE.get((pickup, dropoff), 0)
+            return_empty_km = DISTANCE_CACHE.get((dropoff, base), 0) if dropoff != base else 0
 
-            load["loaded_km"] = loaded_km or 0
-            load["empty_to_pickup_km"] = empty_to_pickup_km or 0
-            load["return_empty_km"] = return_empty_km or 0
+            load["loaded_km"] = loaded_km
+            load["empty_to_pickup_km"] = empty_to_pickup_km
+            load["return_empty_km"] = return_empty_km
             enriched_loads.append(load)
 
         formatted_message = (
