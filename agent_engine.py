@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from llama_index.llms.openai import OpenAI
 from llama_index.core.agent import FunctionCallingAgent
 from llama_index.core.tools import FunctionTool
-from dispatch_planner import auto_dispatch_plan
+from dispatch_tools.planner import auto_dispatch_plan
 
 load_dotenv()
 
