@@ -3,6 +3,7 @@ import requests
 from flask import Flask, request, jsonify, render_template_string
 from urllib.parse import unquote
 from agent_engine import get_agent_runner
+import time
 
 app = Flask(__name__)
 
@@ -12,22 +13,29 @@ agent = get_agent_runner()
 # Google Distance Matrix API function
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 
-def get_distance_km_google(origin, destination):
-    try:
-        url = "https://maps.googleapis.com/maps/api/distancematrix/json"
-        params = {
-            "origins": origin,
-            "destinations": destination,
-            "key": GOOGLE_KEY,
-            "units": "metric"
-        }
-        res = requests.get(url, params=params)
-        data = res.json()
-        if data["rows"] and data["rows"][0]["elements"][0]["status"] == "OK":
-            return round(data["rows"][0]["elements"][0]["distance"]["value"] / 1000, 1)
-        return None
-    except:
-        return None
+
+
+def get_distance_km_google(origin, destination, retries=3, delay=2):
+    url = "https://maps.googleapis.com/maps/api/distancematrix/json"
+    params = {
+        "origins": origin,
+        "destinations": destination,
+        "key": GOOGLE_KEY,
+        "units": "metric"
+    }
+
+    for attempt in range(retries):
+        try:
+            res = requests.get(url, params=params, timeout=10)
+            data = res.json()
+            if data["rows"] and data["rows"][0]["elements"][0]["status"] == "OK":
+                return round(data["rows"][0]["elements"][0]["distance"]["value"] / 1000, 1)
+        except Exception as e:
+            print(f"Distance matrix error ({attempt + 1}/{retries}): {e}")
+            time.sleep(delay)
+
+    return None  # fallback on failure
+
 
 @app.route("/dispatch", methods=["GET", "POST"])
 def handle_dispatch():
