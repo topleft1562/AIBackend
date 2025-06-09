@@ -1,5 +1,6 @@
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
+from urllib.parse import unquote
 from agent_engine import get_agent_runner
 
 app = Flask(__name__)
@@ -12,11 +13,10 @@ def handle_dispatch():
     if request.method == "POST":
         data = request.json
         loads = data.get("loads", [])
-        base_location = data.get("base", "Brandon, MB")
+        base_location = data.get("base", "Brandon,MB")
     else:
-        from urllib.parse import unquote
         loads_param = request.args.get("loads")
-        base_location = request.args.get("base", "Brandon, MB")
+        base_location = request.args.get("base", "Brandon,MB")
         try:
             loads = eval(unquote(loads_param)) if loads_param else []
         except:
@@ -30,12 +30,21 @@ def handle_dispatch():
             f"You are a logistics planner. Assign the following loads to the minimum number of drivers.\n"
             f"Each driver starts and ends at {base_location}.\n"
             f"Try to aim for 55 hours per driver, but never exceed 70 hours.\n"
-            f"Optimize routes to group loads logically and reduce backtracking.\n\n"
+            f"Optimize routes to group loads logically and reduce backtracking.\n"
+            f"For each driver, include: total km, hours, HOS % used, loaded km, and empty km.\n\n"
             f"Loads:\n{loads}"
         )
 
         response = agent.chat(formatted_message)
-        return jsonify({"plan": response.response})
+
+        # Make output HTML-readable
+        html_output = response.response.replace("\n", "<br>") \
+                                        .replace("**", "<b>") \
+                                        .replace("###", "<h3>") \
+                                        .replace("---", "<hr>")
+
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{html_output}</body></html>")
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
