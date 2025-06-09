@@ -27,7 +27,7 @@ def fetch_distance_matrix(origins, destinations):
     try:
         res = requests.get(url, params=params)
         data = res.json()
-        print("Google API response:", data)  # 🔹 Log the full API response for debugging
+        print("Google API response:", data)
         return data
     except Exception as e:
         print("Error fetching distance matrix:", e)
@@ -51,7 +51,6 @@ def handle_dispatch():
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        # Prepare all unique city pairs for distance lookup
         unique_pairs = set()
         base = base_location.replace(" ", "")
         for load in loads:
@@ -62,9 +61,8 @@ def handle_dispatch():
             if dropoff != base:
                 unique_pairs.add((dropoff, base))
 
-        # Batch request to respect Google API's 100 element limit
         pair_list = [(o, d) for (o, d) in unique_pairs if (o, d) not in DISTANCE_CACHE]
-        batch_size = 10  # 10x10 = 100 elements
+        batch_size = 10
         for i in range(0, len(pair_list), batch_size):
             batch = pair_list[i:i + batch_size]
             batch_origins = list(set([o for o, _ in batch]))
@@ -80,7 +78,6 @@ def handle_dispatch():
                             dist_km = round(element["distance"]["value"] / 1000, 1)
                             DISTANCE_CACHE[(origin, destination)] = dist_km
 
-        # Enrich loads with distances
         enriched_loads = []
         for load in loads:
             pickup = load["pickupCity"].replace(" ", "")
@@ -96,26 +93,25 @@ def handle_dispatch():
             enriched_loads.append(load)
 
         formatted_message = (
-            f"You are a logistics planner. Assign the following loads to the minimum number of drivers.\n"
+            f"You are a logistics planner AI. You are given a list of available loads and a base location.\n"
             f"Each driver starts and ends at {base_location}.\n"
-            f"Try to aim for 55 hours per driver, but never exceed 70 hours.\n"
-            f"Optimize routes to group loads logically and reduce backtracking.\n"
-            f"Use an average driving speed of 80 km/h.\n"
-            f"Assume each load/unload takes 1.5 hours.\n"
-            f"Only return plans where loaded km is at least 70% of total km driven.\n"
-            f"For each driver, show the exact route like: base → pickup (empty) → dropoff (loaded) → next pickup, etc.\n"
-            f"Also include: total km, loaded km, empty km, total hours, and HOS % used.\n\n"
+            f"Your task is to ONLY return optimized driver routes that achieve 70% loaded km or better.\n"
+            f"Use 80 km/h as average speed, and 1.5 hours for each pickup or delivery stop.\n"
+            f"If there are routes that almost qualify but fall short of 70%, include a clear suggestion\n"
+            f"on what additional loads could be inserted (from which city to where) to improve efficiency.\n"
+            f"Also, analyze any origin or destination areas that if filled with outbound or return loads could help meet the 70% threshold.\n"
+            f"Highlight those cities clearly and suggest potential load lanes.\n\n"
+            f"For each driver, return output formatted like:\n"
+            f"brandon → redvers (empty) — 300 km\nredvers → brandon (loaded) — 300 km\ntotal km: 600\nloaded %: 50%\nHOS: 11.3 hrs\n\n"
+            f"Do this for each valid driver. Format everything evenly. No bold, no markdown, no headers.\n\n"
             f"Loads:\n{enriched_loads}"
         )
 
         response = agent.chat(formatted_message)
 
-        html_output = response.response.replace("\n", "<br>") \
-                                        .replace("**", "<b>") \
-                                        .replace("###", "<h3>") \
-                                        .replace("---", "<hr>")
+        html_output = response.response.replace("\n", "<br>")
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{html_output}</body></html>")
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
