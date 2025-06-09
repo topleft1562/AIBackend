@@ -54,8 +54,8 @@ def handle_dispatch():
         unique_pairs = set()
         base = base_location.replace(" ", "")
         for load in loads:
-            pickup = load["pickupCity"].replace(" ", "")
-            dropoff = load["dropoffCity"].replace(" ", "")
+            pickup = load["pickupCity"].strip()
+            dropoff = load["dropoffCity"].strip()
             unique_pairs.add((base, pickup))
             unique_pairs.add((pickup, dropoff))
             if dropoff != base:
