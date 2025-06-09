@@ -1,7 +1,7 @@
 import os
 import requests
 from flask import Flask, request, jsonify, render_template_string
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 from agent_engine import get_agent_runner
 
 app = Flask(__name__)
@@ -19,8 +19,8 @@ DISTANCE_CACHE = {}
 def fetch_distance_matrix(origins, destinations):
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
-        "origins": "|".join(origins),
-        "destinations": "|".join(destinations),
+        "origins": "|".join([quote(o) for o in origins]),
+        "destinations": "|".join([quote(d) for d in destinations]),
         "key": GOOGLE_KEY,
         "units": "metric"
     }
@@ -52,7 +52,7 @@ def handle_dispatch():
 
     try:
         unique_pairs = set()
-        base = base_location.replace(" ", "")
+        base = base_location.strip()
         for load in loads:
             pickup = load["pickupCity"].strip()
             dropoff = load["dropoffCity"].strip()
@@ -80,8 +80,8 @@ def handle_dispatch():
 
         enriched_loads = []
         for load in loads:
-            pickup = load["pickupCity"].replace(" ", "")
-            dropoff = load["dropoffCity"].replace(" ", "")
+            pickup = load["pickupCity"].strip()
+            dropoff = load["dropoffCity"].strip()
 
             empty_to_pickup_km = DISTANCE_CACHE.get((base, pickup), 0)
             loaded_km = DISTANCE_CACHE.get((pickup, dropoff), 0)
@@ -93,23 +93,19 @@ def handle_dispatch():
             enriched_loads.append(load)
 
         formatted_message = (
-    f"You are a logistics planner AI. You are given a list of available loads and a base location.\n"
-    f"Each driver starts and ends at {base_location}.\n"
-    f"Your task is to extract as many optimized driver routes as possible from the loads provided, "
-    f"where each route achieves at least 70% loaded km.\n"
-    f"Use 80 km/h as average speed, and 1.5 hours for each pickup or delivery stop.\n"
-    f"If any route nearly qualifies but falls short, include a clear suggestion on what additional loads (city to city) would help.\n"
-    f"Also identify origin/destination areas where additional loads would enable more 70%+ routes.\n\n"
-    f"For each route, format like:\n"
-    f"brandon → redvers (empty) — 300 km\n"
-    f"redvers → brandon (loaded) — 300 km\n"
-    f"total km: 600\n"
-    f"loaded %: 50%\n"
-    f"HOS: 11.3 hrs\n\n"
-    f"Do this for each valid driver. No markdown. Keep output uniform and clean.\n\n"
-    f"Loads:\n{enriched_loads}"
-)
-
+            f"You are a logistics planner AI. You are given a list of available loads and a base location.\n"
+            f"Each driver starts and ends at {base_location}.\n"
+            f"Your task is to ONLY return optimized driver routes that achieve 70% loaded km or better.\n"
+            f"Use 80 km/h as average speed, and 1.5 hours for each pickup or delivery stop.\n"
+            f"If there are routes that almost qualify but fall short of 70%, include a clear suggestion\n"
+            f"on what additional loads could be inserted (from which city to where) to improve efficiency.\n"
+            f"Also, analyze any origin or destination areas that if filled with outbound or return loads could help meet the 70% threshold.\n"
+            f"Highlight those cities clearly and suggest potential load lanes.\n\n"
+            f"For each driver, return output formatted like:\n"
+            f"brandon → redvers (empty) — 300 km\nredvers → brandon (loaded) — 300 km\ntotal km: 600\nloaded %: 50%\nHOS: 11.3 hrs\n\n"
+            f"Do this for each valid driver. Format everything evenly. No bold, no markdown, no headers.\n\n"
+            f"Loads:\n{enriched_loads}"
+        )
 
         response = agent.chat(formatted_message)
 
