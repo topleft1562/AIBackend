@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 from flask import Flask, request, jsonify, render_template_string
 from urllib.parse import unquote, quote
@@ -55,7 +56,7 @@ def handle_dispatch():
         loads_param = request.args.get("loads")
         base_location = request.args.get("base", "Brandon,MB")
         try:
-            loads = eval(unquote(loads_param)) if loads_param else []
+            loads = json.loads(unquote(loads_param)) if loads_param else []
         except:
             return jsonify({"error": "Invalid loads format."}), 400
 
