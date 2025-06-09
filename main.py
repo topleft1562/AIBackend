@@ -62,22 +62,23 @@ def handle_dispatch():
             if dropoff != base:
                 unique_pairs.add((dropoff, base))
 
-        # Fetch missing distances in batches
-        origins = []
-        destinations = []
-        for (orig, dest) in unique_pairs:
-            if (orig, dest) not in DISTANCE_CACHE:
-                origins.append(orig)
-                destinations.append(dest)
+        # Batch request to respect Google API's 100 element limit
+        pair_list = [(o, d) for (o, d) in unique_pairs if (o, d) not in DISTANCE_CACHE]
+        batch_size = 10  # 10x10 = 100 elements
+        for i in range(0, len(pair_list), batch_size):
+            batch = pair_list[i:i + batch_size]
+            batch_origins = list(set([o for o, _ in batch]))
+            batch_destinations = list(set([d for _, d in batch]))
 
-        if origins and destinations:
-            distance_data = fetch_distance_matrix(origins, destinations)
+            distance_data = fetch_distance_matrix(batch_origins, batch_destinations)
             if distance_data and distance_data.get("rows"):
-                for i, row in enumerate(distance_data["rows"]):
-                    for j, element in enumerate(row["elements"]):
+                for o_idx, origin in enumerate(batch_origins):
+                    row = distance_data["rows"][o_idx]
+                    for d_idx, destination in enumerate(batch_destinations):
+                        element = row["elements"][d_idx]
                         if element["status"] == "OK":
                             dist_km = round(element["distance"]["value"] / 1000, 1)
-                            DISTANCE_CACHE[(origins[i], destinations[j])] = dist_km
+                            DISTANCE_CACHE[(origin, destination)] = dist_km
 
         # Enrich loads with distances
         enriched_loads = []
