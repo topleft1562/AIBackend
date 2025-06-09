@@ -22,6 +22,13 @@ def normalize_city(city_str):
 
 # Helper function to batch fetch distances from Google API
 def fetch_distance_matrix(origins, destinations):
+    origins = [o for o in origins if o and o.strip()]
+    destinations = [d for d in destinations if d and d.strip()]
+
+    if not origins or not destinations:
+        print("⚠️ Skipping empty origin/destination batch")
+        return None
+
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
         "origins": "|".join([quote(o) for o in origins]),
@@ -71,8 +78,8 @@ def handle_dispatch():
         batch_size = 10
         for i in range(0, len(pair_list), batch_size):
             batch = pair_list[i:i + batch_size]
-            batch_origins = list(set([o for o, _ in batch]))
-            batch_destinations = list(set([d for _, d in batch]))
+            batch_origins = list(set([o for o, _ in batch if o and o.strip()]))
+            batch_destinations = list(set([d for _, d in batch if d and d.strip()]))
 
             distance_data = fetch_distance_matrix(batch_origins, batch_destinations)
             if distance_data and distance_data.get("rows"):
