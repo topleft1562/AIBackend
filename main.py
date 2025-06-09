@@ -107,9 +107,15 @@ def handle_dispatch():
                 print(f"⚠️ Skipping load due to missing distances: {pickup} → {dropoff}")
                 continue
 
+            reload_options = {
+                other["pickupCity"]: DISTANCE_CACHE.get((dropoff, other["pickupCity"]))
+                for other in loads if other["pickupCity"] != pickup
+            }
+
             load["loaded_km"] = loaded_km
             load["empty_to_pickup_km"] = empty_to_pickup_km
             load["return_empty_km"] = return_empty_km
+            load["reload_options"] = reload_options
             enriched_loads.append(load)
 
         formatted_message = (
