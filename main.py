@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify
-from agent_engine import get_agent_runner
+from dispatch_agent import get_agent_runner
 
 app = Flask(__name__)
 
