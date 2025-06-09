@@ -15,6 +15,11 @@ GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 # Cached distance dictionary
 DISTANCE_CACHE = {}
 
+# Normalize city formatting
+def normalize_city(city_str):
+    city_str = city_str.replace(",", ", ").replace("  ", " ").title()
+    return city_str.strip()
+
 # Helper function to batch fetch distances from Google API
 def fetch_distance_matrix(origins, destinations):
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
@@ -51,15 +56,14 @@ def handle_dispatch():
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        unique_points = set()
-        base = base_location.strip()
+        base = normalize_city(base_location)
+        unique_points = set([base])
 
         for load in loads:
-            pickup = load["pickupCity"].strip()
-            dropoff = load["dropoffCity"].strip()
-            unique_points.add(base)
-            unique_points.add(pickup)
-            unique_points.add(dropoff)
+            load["pickupCity"] = normalize_city(load["pickupCity"])
+            load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            unique_points.add(load["pickupCity"])
+            unique_points.add(load["dropoffCity"])
 
         unique_points = list(unique_points)
         pair_list = [(o, d) for o in unique_points for d in unique_points if o != d and (o, d) not in DISTANCE_CACHE]
@@ -79,15 +83,21 @@ def handle_dispatch():
                         if element["status"] == "OK":
                             dist_km = round(element["distance"]["value"] / 1000, 1)
                             DISTANCE_CACHE[(origin, destination)] = dist_km
+                        else:
+                            print(f"⚠️ Distance not found for {origin} → {destination}: {element['status']}")
 
         enriched_loads = []
         for load in loads:
-            pickup = load["pickupCity"].strip()
-            dropoff = load["dropoffCity"].strip()
+            pickup = load["pickupCity"]
+            dropoff = load["dropoffCity"]
 
-            empty_to_pickup_km = DISTANCE_CACHE.get((base, pickup), 0)
-            loaded_km = DISTANCE_CACHE.get((pickup, dropoff), 0)
-            return_empty_km = DISTANCE_CACHE.get((dropoff, base), 0) if dropoff != base else 0
+            empty_to_pickup_km = DISTANCE_CACHE.get((base, pickup))
+            loaded_km = DISTANCE_CACHE.get((pickup, dropoff))
+            return_empty_km = DISTANCE_CACHE.get((dropoff, base)) if dropoff != base else 0
+
+            if empty_to_pickup_km is None or loaded_km is None:
+                print(f"⚠️ Skipping load due to missing distances: {pickup} → {dropoff}")
+                continue
 
             load["loaded_km"] = loaded_km
             load["empty_to_pickup_km"] = empty_to_pickup_km
