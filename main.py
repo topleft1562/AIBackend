@@ -54,15 +54,13 @@ def handle_dispatch():
             dropoff = load["dropoffCity"].replace(" ", "")
             base = base_location.replace(" ", "")
 
-            loaded_km = get_distance_km_google(pickup, dropoff)
             empty_to_pickup_km = get_distance_km_google(base, pickup)
-            return_empty_km = get_distance_km_google(dropoff, base)
-            round_trip_empty = get_distance_km_google(dropoff, pickup)
+            loaded_km = get_distance_km_google(pickup, dropoff)
+            return_empty_km = get_distance_km_google(dropoff, base) if dropoff != base else 0
 
             load["loaded_km"] = loaded_km or 0
             load["empty_to_pickup_km"] = empty_to_pickup_km or 0
             load["return_empty_km"] = return_empty_km or 0
-            load["cycle_empty_km"] = round_trip_empty or 0
             enriched_loads.append(load)
 
         formatted_message = (
