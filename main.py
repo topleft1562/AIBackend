@@ -27,8 +27,10 @@ def fetch_distance_matrix(origins, destinations):
     try:
         res = requests.get(url, params=params)
         data = res.json()
+        print("Google API response:", data)  # 🔹 Log the full API response for debugging
         return data
-    except:
+    except Exception as e:
+        print("Error fetching distance matrix:", e)
         return None
 
 @app.route("/dispatch", methods=["GET", "POST"])
