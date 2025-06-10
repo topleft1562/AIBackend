@@ -114,9 +114,8 @@ def handle_dispatch():
         for origin, dests in origin_dest_map.items():
             get_distances_batch(origin, list(dests))
 
-        # Build enriched load data
         result = []
-        for load in loads:
+        for i, load in enumerate(loads):
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
 
@@ -124,16 +123,31 @@ def handle_dispatch():
             for other in loads:
                 if other["pickupCity"] != pickup:
                     next_pickup = other["pickupCity"]
-                    reload_options[next_pickup] = DISTANCE_CACHE.get(f"{dropoff}|{next_pickup}")
+                    dist = DISTANCE_CACHE.get(f"{dropoff}|{next_pickup}")
+                    reload_options[next_pickup] = dist
+
+            # Check if any loads start exactly where this one ends
+            direct_reload = next(
+                (other for other in loads if other["pickupCity"] == dropoff and other["load_id"] != load["load_id"]),
+                None
+            )
+
+            # If there's a perfect reload, we treat that segment as loaded
+            direct_reload_km = DISTANCE_CACHE.get(f"{dropoff}|{direct_reload['dropoffCity']}") if direct_reload else 0
+
+            total_loaded = DISTANCE_CACHE.get(f"{pickup}|{dropoff}", 0)
+            if direct_reload_km:
+                total_loaded += direct_reload_km  # count reload leg as loaded too
 
             result.append({
                 "load_id": load["load_id"],
                 "pickup": pickup,
                 "dropoff": dropoff,
                 "deadhead_km": DISTANCE_CACHE.get(f"{base}|{pickup}"),
-                "loaded_km": DISTANCE_CACHE.get(f"{pickup}|{dropoff}"),
+                "loaded_km": round(total_loaded, 1),
                 "return_km": DISTANCE_CACHE.get(f"{dropoff}|{base}"),
-                "reload_options": reload_options
+                "reload_options": reload_options,
+                "direct_reload": direct_reload["load_id"] if direct_reload else None
             })
 
         formatted_message = (
@@ -165,9 +179,10 @@ def handle_dispatch():
             "- If a dropoff city is the same as another pickup, it must be chained.\n"
             "- The goal is not to return to base after each load, but only once the route is complete.\n"
             "- Minimum 70% loaded km per driver.\n"
-            "- If the dropoff city matches the next pickup city, this is not a return or deadhead — it is a direct reload."
-            "- In those cases, treat the entire trip (both legs) as loaded km."
-            "- Do not count the distance between a dropoff and matching pickup as empty."
+            "- If a load’s dropoff city matches another’s pickup, this should be treated as one continuous loaded trip. The km between them should not count as empty. Dispatch accordingly.\n"
+            "- In those cases, treat the entire trip (both legs) as loaded km.\n"
+            "- Do not count the distance between a dropoff and matching pickup as empty.\n"
+            "- Is any loads are not planned, output them as Unassigned loads.\n"
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
 )
 
