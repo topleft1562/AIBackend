@@ -51,6 +51,8 @@ def handle_dispatch():
     if request.method == "POST":
         data = request.json
         loads = data.get("loads", [])
+        base_location = data.get("base", "Brandon,MB")
+        
     else:
         loads_param = request.args.get("loads")
         try:
