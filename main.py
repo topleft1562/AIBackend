@@ -102,6 +102,7 @@ def handle_dispatch():
 
         # Step 2: Fetch all required distances in batches
         batch_size = 10
+        pairs_to_fetch = list(pairs_to_fetch)
         for i in range(0, len(pairs_to_fetch), batch_size):
             batch = pairs_to_fetch[i:i + batch_size]
             origins = list(set([o for o, _ in batch]))
