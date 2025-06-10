@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dispatch Optimizer</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, button, select { padding: 5px; margin-top: 5px; }
+    .load-row { margin-bottom: 10px; }
+    .load-row input { margin-right: 5px; }
+  </style>
+</head>
+<body>
+  <h2>Dispatch Optimizer</h2>
+  <form id="dispatchForm">
+    <label for="base">Base Location:</label>
+    <input type="text" id="base" name="base" placeholder="Brandon, MB" required />
+
+    <h3>Loads</h3>
+    <div id="loadsContainer">
+      <div class="load-row">
+        <input type="text" name="pickup" placeholder="Pickup City" required />
+        <input type="text" name="dropoff" placeholder="Dropoff City" required />
+        <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
+        <button type="button" onclick="removeLoadRow(this)">❌</button>
+      </div>
+    </div>
+    <button type="button" onclick="addLoadRow()">➕ Add Load</button><br><br>
+    <button type="submit">Submit</button>
+  </form>
+
+  <div id="output" style="margin-top:30px;"></div>
+
+  <script>
+    function addLoadRow() {
+      const container = document.getElementById("loadsContainer");
+      const row = document.createElement("div");
+      row.className = "load-row";
+      row.innerHTML = `
+        <input type="text" name="pickup" placeholder="Pickup City" required />
+        <input type="text" name="dropoff" placeholder="Dropoff City" required />
+        <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
+        <button type="button" onclick="removeLoadRow(this)">❌</button>
+      `;
+      container.appendChild(row);
+    }
+
+    function removeLoadRow(btn) {
+      btn.parentElement.remove();
+    }
+
+    document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const form = e.target;
+      const base = form.base.value.trim();
+      const pickups = form.querySelectorAll("input[name='pickup']");
+      const dropoffs = form.querySelectorAll("input[name='dropoff']");
+      const counts = form.querySelectorAll("input[name='count']");
+
+      const loads = [];
+      for (let i = 0; i < pickups.length; i++) {
+        const pickup = pickups[i].value.trim();
+        const dropoff = dropoffs[i].value.trim();
+        const count = parseInt(counts[i].value);
+        for (let j = 0; j < count; j++) {
+          loads.push({ pickupCity: pickup, dropoffCity: dropoff });
+        }
+      }
+
+      const response = await fetch("/dispatch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base, loads })
+      });
+
+      const html = await response.text();
+      document.getElementById("output").innerHTML = html;
+    });
+  </script>
+</body>
+</html>

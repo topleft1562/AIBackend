@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 from urllib.parse import unquote, quote
 from agent_engine import get_agent_runner
 from flask import render_template_string
-
+from flask import render_template
 
 app = Flask(__name__)
 
@@ -156,9 +156,12 @@ def handle_dispatch():
             "OutPut needs - Per Driver\n"
             "- Total Km's empty\n"
             "- Total Km's Loaded\n"
-            "- Loaded %\n"
+            "- Total Loaded percentage for the trip - including return to base\n"
             "- Approx hours used in cycle ( 70/36 )\n"
             " -- 80km\h avg & 1.5 hrs to load and unload.\n\n"
+            "Recomendations:\n"
+            "- give recomendations for spots to look for loads to lower empty miles.\n"
+            "- ex: spots where we are going empty for more than 100 km's\n"
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
 )
 
@@ -172,6 +175,11 @@ def handle_dispatch():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/")
+def show_form():
+    return render_template("dispatch_form.html")
 
 # Start the Flask server
 if __name__ == "__main__":
