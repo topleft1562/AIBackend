@@ -159,6 +159,12 @@ def handle_dispatch():
             "Final section:\n"
             "- Suggestions on reducing empty miles (e.g., any trip segments with >100 km deadhead)\n"
             "- Missed reload opportunities\n\n"
+            "Constraints:\n"
+            "- Drivers should minimize empty km.\n"
+            "- Drivers should always attempt to reload after a dropoff, using the closest available pickup from `reload_options`.\n"
+            "- If a dropoff city is the same as another pickup, it must be chained.\n"
+            "- The goal is not to return to base after each load, but only once the route is complete.\n"
+            "- Minimum 70% loaded km per driver.\n"
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
 )
 

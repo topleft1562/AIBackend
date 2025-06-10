@@ -22,6 +22,8 @@ def get_agent_runner():
             "- Focus on minimizing empty kilometers.\n\n"
             "Each driver starts and ends at the base city.\n"
             "Use reload options to reduce deadhead between loads.\n\n"
+            "Drivers should always look for a next load pickup near their dropoff location before returning to base.\n"
+            "If a dropoff city matches or is near another pickup city, that driver should continue instead of returning.\n\n"                     
             "For each driver, output:\n"
             "- Route: list of load IDs\n"
             "- Empty kilometers\n"
