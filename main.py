@@ -16,16 +16,26 @@ def normalize_city(city_str):
     city_str = city_str.replace(",", ", ").replace("  ", " ").title()
     return city_str.strip()
 
-def get_distance(origin, destination):
-    """Check cache, else fetch from API and store in cache"""
-    key = f"{origin}|{destination}"
-    if key in DISTANCE_CACHE:
-        return DISTANCE_CACHE[key]
+def get_distances_batch(origin, destinations):
+    """Fetch and cache distances from one origin to multiple destinations"""
+    origin = normalize_city(origin)
+    destinations = [normalize_city(d) for d in destinations if d != origin]
+
+    # Skip if already cached
+    uncached = [
+        d for d in destinations
+        if f"{origin}|{d}" not in DISTANCE_CACHE
+    ]
+    if not uncached:
+        return
+
+    print(f"\n📦 Fetching from origin: {origin}")
+    print(f"➡ Destinations: {uncached}")
 
     url = "https://maps.googleapis.com/maps/api/distancematrix/json"
     params = {
-        "origins": quote(origin),
-        "destinations": quote(destination),
+        "origins": origin,
+        "destinations": "|".join(uncached),
         "key": GOOGLE_KEY,
         "units": "metric"
     }
@@ -33,15 +43,20 @@ def get_distance(origin, destination):
     try:
         res = requests.get(url, params=params)
         data = res.json()
-        if data["rows"][0]["elements"][0]["status"] == "OK":
-            dist_km = round(data["rows"][0]["elements"][0]["distance"]["value"] / 1000, 1)
-            DISTANCE_CACHE[key] = dist_km
-            return dist_km
-    except Exception as e:
-        print(f"Error fetching distance from {origin} to {destination}:", e)
+        print("🧾 API Response:", json.dumps(data, indent=2))
 
-    DISTANCE_CACHE[key] = None
-    return None
+        if data.get("rows"):
+            elements = data["rows"][0]["elements"]
+            for i, d in enumerate(uncached):
+                key = f"{origin}|{d}"
+                element = elements[i]
+                if element.get("status") == "OK":
+                    DISTANCE_CACHE[key] = round(element["distance"]["value"] / 1000, 1)
+                else:
+                    DISTANCE_CACHE[key] = None
+    except Exception as e:
+        print(f"🚨 Error fetching from {origin} to batch:", e)
+
 
 @app.route("/dispatch", methods=["GET", "POST"])
 def handle_dispatch():
@@ -82,9 +97,16 @@ def handle_dispatch():
                 if other["pickupCity"] != pickup:
                     city_pairs.add((dropoff, other["pickupCity"]))  # reload options
 
-        # Fetch missing distances and store in cache
+        # Group all unique destinations for each origin
+        from collections import defaultdict
+        origin_dest_map = defaultdict(set)
+
         for origin, dest in city_pairs:
-            get_distance(origin, dest)
+            origin_dest_map[origin].add(dest)
+
+        # Batch fetch
+        for origin, dests in origin_dest_map.items():
+            get_distances_batch(origin, list(dests))
 
         # Build enriched load data
         result = []
