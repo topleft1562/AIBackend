@@ -51,10 +51,8 @@ def handle_dispatch():
     if request.method == "POST":
         data = request.json
         loads = data.get("loads", [])
-        base_location = data.get("base", "Brandon,MB")
     else:
         loads_param = request.args.get("loads")
-        base_location = request.args.get("base", "Brandon,MB")
         try:
             loads = json.loads(unquote(loads_param)) if loads_param else []
         except:
@@ -64,87 +62,63 @@ def handle_dispatch():
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        base = normalize_city(base_location)
-        unique_points = set([base])
-
+        # Step 1: Normalize and collect all unique points
         for load in loads:
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
-            unique_points.add(load["pickupCity"])
-            unique_points.add(load["dropoffCity"])
 
-        unique_points = list(unique_points)
-        pair_list = [(o, d) for o in unique_points for d in unique_points if o != d and (o, d) not in DISTANCE_CACHE]
+        all_points = set()
+        for load in loads:
+            all_points.add(load["pickupCity"])
+            all_points.add(load["dropoffCity"])
 
+        all_points = list(all_points)
+        pairs_to_fetch = [(o, d) for o in all_points for d in all_points if o != d and (o, d) not in DISTANCE_CACHE]
+
+        # Step 2: Fetch all required distances in batches
         batch_size = 10
-        for i in range(0, len(pair_list), batch_size):
-            batch = pair_list[i:i + batch_size]
-            batch_origins = list(set([o for o, _ in batch if o and o.strip()]))
-            batch_destinations = list(set([d for _, d in batch if d and d.strip()]))
+        for i in range(0, len(pairs_to_fetch), batch_size):
+            batch = pairs_to_fetch[i:i + batch_size]
+            origins = list(set([o for o, _ in batch]))
+            destinations = list(set([d for _, d in batch]))
 
-            distance_data = fetch_distance_matrix(batch_origins, batch_destinations)
-            if distance_data and distance_data.get("rows"):
-                for o_idx, origin in enumerate(batch_origins):
-                    row = distance_data["rows"][o_idx]
-                    for d_idx, destination in enumerate(batch_destinations):
+            data = fetch_distance_matrix(origins, destinations)
+            if data and data.get("rows"):
+                for o_idx, origin in enumerate(origins):
+                    row = data["rows"][o_idx]
+                    for d_idx, destination in enumerate(destinations):
                         element = row["elements"][d_idx]
                         if element["status"] == "OK":
                             dist_km = round(element["distance"]["value"] / 1000, 1)
                             DISTANCE_CACHE[(origin, destination)] = dist_km
                         else:
-                            print(f"⚠️ Distance not found for {origin} → {destination}: {element['status']}")
+                            DISTANCE_CACHE[(origin, destination)] = None
+                            print(f"⚠️ Distance not found for {origin} → {destination}")
 
-        enriched_loads = []
+        # Step 3: Build final enriched output
+        result = []
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-
-            empty_to_pickup_km = DISTANCE_CACHE.get((base, pickup))
             loaded_km = DISTANCE_CACHE.get((pickup, dropoff))
-            return_empty_km = DISTANCE_CACHE.get((dropoff, base)) if dropoff != base else 0
-
-            if empty_to_pickup_km is None or loaded_km is None:
-                print(f"⚠️ Skipping load due to missing distances: {pickup} → {dropoff}")
-                continue
 
             reload_options = {
                 other["pickupCity"]: DISTANCE_CACHE.get((dropoff, other["pickupCity"]))
                 for other in loads if other["pickupCity"] != pickup
             }
 
-            load["loaded_km"] = loaded_km
-            load["empty_to_pickup_km"] = empty_to_pickup_km
-            load["return_empty_km"] = return_empty_km
-            load["reload_options"] = reload_options
-            enriched_loads.append(load)
+            result.append({
+                "pickup": pickup,
+                "dropoff": dropoff,
+                "loaded_km": loaded_km,
+                "reload_options": reload_options
+            })
 
-        formatted_message = (
-            f"You are a logistics planner AI. You are given a list of available loads and a base location.\n"
-            f"Each driver starts and ends at {base_location}.\n"
-            f"Your task is to extract as many optimized driver routes as possible from the loads provided, \n"
-            f"where each route achieves at least 70% loaded km.\n"
-            f"Use 80 km/h as average speed, and 1.5 hours for each pickup or delivery stop.\n"
-            f"Try chaining multiple loads together per driver to meet efficiency.\n"
-            f"If any route nearly qualifies but falls short, include a clear suggestion on what additional loads (city to city) would help.\n"
-            f"Also identify origin/destination areas where additional loads would enable more 70%+ routes.\n\n"
-            f"For each route, format like:\n"
-            f"brandon → redvers (empty) — 300 km\n"
-            f"redvers → brandon (loaded) — 300 km\n"
-            f"total km: 600\n"
-            f"loaded %: 50%\n"
-            f"HOS: 11.3 hrs\n\n"
-            f"Do this for each valid driver. No markdown. Keep output uniform and clean.\n\n"
-            f"Loads:\n{enriched_loads}"
-        )
-
-        response = agent.chat(formatted_message)
-
-        html_output = response.response.replace("\n", "<br>")
-
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
+        return jsonify({"enriched_loads": result})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 # 🔹 Start the Flask server
 if __name__ == "__main__":
