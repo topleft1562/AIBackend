@@ -296,8 +296,8 @@ def optimize_routes():
 def show_form():
     return render_template("dispatch_form.html")
 
-@route_optimizer.route("/optimize", methods=["GET"])
-def optimize_form():
+@app.route("/optimize")
+def show_form():
     return render_template("optimize_form.html")
 
 # Start the Flask server
