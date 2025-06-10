@@ -99,10 +99,6 @@ def handle_dispatch():
                 other["pickupCity"]: DISTANCE_CACHE.get(f"{dropoff}|{other['pickupCity']}")
                 for other in loads if other["pickupCity"] != pickup
             }
-            direct_reload = next(
-                (other for other in loads if other["pickupCity"] == dropoff and other["load_id"] != load["load_id"]),
-                None
-            )
             result.append({
                 "load_id": load["load_id"],
                 "pickup": pickup,
@@ -110,11 +106,8 @@ def handle_dispatch():
                 "deadhead_km": 0 if base == pickup else DISTANCE_CACHE.get(f"{base}|{pickup}", 0),
                 "loaded_km": round(DISTANCE_CACHE.get(f"{pickup}|{dropoff}", 0), 1),
                 "return_km": DISTANCE_CACHE.get(f"{dropoff}|{base}", 0),
-                "reload_options": reload_options,
-                "direct_reload": direct_reload["load_id"] if direct_reload else None
+                "reload_options": reload_options
             })
-
-            print(f"results:  {result}")
 
         formatted_message = (
             "You are Dispatchy — an efficient AI dispatcher.\n\n"
@@ -128,8 +121,7 @@ def handle_dispatch():
             "- deadhead distance (from base to pickup)\n"
             "- loaded distance (from pickup to dropoff)\n"
             "- return distance (from dropoff to base)\n"
-            "- reload options (distance from current dropoff to other pickup cities)\n"
-            "- direct_reload means another load begins at this dropoff city\n\n"
+            "- reload options (distance from current dropoff to other pickup cities)\n\n"
             "Expected Output:\n"
             "- For each driver:\n"
             "  - Route (list of load IDs)\n"
@@ -142,13 +134,16 @@ def handle_dispatch():
             "- Missed reload opportunities\n\n"
             "Constraints:\n"
             "- Drivers should minimize empty km.\n"
-            "- Drivers should always attempt to reload after a dropoff, using the closest available pickup from `reload_options`.\n"
-            "- If a dropoff city is the same as another pickup, it must be chained.\n"
+            "- Do not assume any pre-linked routes.\n"
+            "- Evaluate reloads in sequence using reload_options.\n"
+            "- If a dropoff city matches another pickup, or is within 100–200 km of one, treat as a reload.\n"
             "- The goal is not to return to base after each load, but only once the route is complete.\n"
+            "- Each driver must return to base at the end of their route.\n"
             "- Minimum 70% loaded km per driver.\n"
-            "- If a load’s dropoff city matches another’s pickup, treat as one continuous loaded trip — do not count the distance between them as empty.\n"
             "- If any loads are not planned, output them as Unassigned loads.\n\n"
-            f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
+            f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}\n\n"
+"Note: If multiple loads have the same pickup and dropoff, treat each load as separate. Do not assume they are chained unless the dropoff of one is the pickup of the next. Always include the distance back to pickup as empty km when a route returns to the same pickup."
+
         )
 
         response = agent.chat(formatted_message)
