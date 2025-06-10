@@ -84,7 +84,9 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            city_pairs.update({(pickup, dropoff)})
+            city_pairs.update({(base, pickup), (pickup, dropoff), (dropoff, base)})
+            for other in loads:
+                city_pairs.add((dropoff, other["pickupCity"]))
 
         origin_dest_map = defaultdict(set)
         for origin, dest in city_pairs:
@@ -96,21 +98,64 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
+            reload_options = {
+                f"load_{other['load_id']}": {
+                    "pickup": other["pickupCity"],
+                    "distance": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]))
+                }
+                for other in loads if other["load_id"] != load["load_id"]
+            }
+
             result.append({
                 "load_id": load["load_id"],
                 "pickup": pickup,
                 "dropoff": dropoff,
-                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1)
+                "deadhead_km": 0 if base == pickup else DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
+                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
+                "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
+                "reload_options": reload_options,
             })
 
+            print(f"results: {result}")
+            
         formatted_message = (
             "You are Dispatchy — an efficient AI dispatcher.\n\n"
-            "Objective:\n"
-            "- Identify routes from the list of loads that result in 70% or higher loaded km.\n"
-            "- Determine which loads can be chained together to maintain this threshold.\n"
-            "- For any leftover unassigned loads, suggest ideal locations (pickup or dropoff) where additional loads would help reach the threshold.\n\n"
-            "Here is the list of enriched loads:\n"
-            f"{json.dumps(result, indent=2)}"
+            "The objective is simple:\n"
+            "- Get all loads done using as few drivers as possible.\n"
+            "- Ensure each driver hits at least 70% loaded km.\n"
+            "- Maximize route efficiency and minimize empty miles.\n\n"
+            "Each load includes:\n"
+            "- pickup city\n"
+            "- dropoff city\n"
+            "- deadhead distance (from base to pickup)\n"
+            "- loaded distance (from pickup to dropoff)\n"
+            "- return distance (from dropoff to base)\n"
+            "- reload options (each load ID with pickup and distance from previous dropoff)\n"
+            "Expected Output:\n"
+            "- For each driver:\n"
+            "  - Route (list of load IDs)\n"
+            "  - Total empty km\n"
+            "  - Total loaded km\n"
+            "  - Loaded percent (loaded / total)\n"
+            "  - Estimated hours: based on 80 km/h travel speed + 2 hours per load\n\n"
+            "Final section:\n"
+            "- Suggestions on reducing empty miles (e.g., any trip segments with >100 km deadhead)\n"
+            "- Missed reload opportunities\n\n"
+            "Constraints:\n"
+            "- Drivers should minimize empty km.\n"
+            "- Do not assume any pre-linked routes.\n"
+            "- Evaluate reloads in sequence using reload_options.\n"
+            "- If a dropoff city matches another pickup, or is within 100–200 km of one, treat as a reload.\n"
+            "- The goal is not to return to base after each load, but only once the route is complete.\n"
+            "- Each driver must return to base at the end of their route.\n"
+            "- Minimum 70% loaded km per driver.\n"
+            "- If any loads are not planned, output them as Unassigned loads.\n"
+            "- Consider all possible load sequences and chaining combinations.\n"
+            "- Your goal is to globally minimize total empty kilometers across all drivers.\n"
+            "- Prefer solutions with fewer drivers and lower empty km, even if the order of loads changes.\n"
+            "- You may reorder loads to achieve better chaining.\n\n"
+            "Note: If multiple loads have the same pickup and dropoff, treat each load as separate. Do not assume they are chained unless the dropoff of one is the pickup of the next. Always include the distance back to pickup as empty km when a route returns to the same pickup.\n"
+            f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
         )
 
         response = agent.chat(formatted_message)
