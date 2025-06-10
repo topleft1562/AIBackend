@@ -121,7 +121,7 @@ def handle_dispatch():
             })
 
             print(f"results: {result}")
-
+            
         formatted_message = (
             "You are Dispatchy — an efficient AI dispatcher.\n\n"
             "The objective is simple:\n"
@@ -154,7 +154,11 @@ def handle_dispatch():
             "- The goal is not to return to base after each load, but only once the route is complete.\n"
             "- Each driver must return to base at the end of their route.\n"
             "- Minimum 70% loaded km per driver.\n"
-            "- If any loads are not planned, output them as Unassigned loads.\n\n"
+            "- If any loads are not planned, output them as Unassigned loads.\n"
+            "- Consider all possible load sequences and chaining combinations.\n"
+            "- Your goal is to globally minimize total empty kilometers across all drivers.\n"
+            "- Prefer solutions with fewer drivers and lower empty km, even if the order of loads changes.\n"
+            "- You may reorder loads to achieve better chaining.\n\n"
             "Note: If multiple loads have the same pickup and dropoff, treat each load as separate. Do not assume they are chained unless the dropoff of one is the pickup of the next. Always include the distance back to pickup as empty km when a route returns to the same pickup.\n"
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
         )
