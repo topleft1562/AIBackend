@@ -4,7 +4,6 @@ import requests
 from urllib.parse import unquote, quote
 from agent_engine import get_agent_runner, get_route_assessor
 from flask import Flask, Blueprint, request, jsonify, render_template, render_template_string
-from main import normalize_city, get_distances_batch, DISTANCE_CACHE
 from collections import defaultdict
 
 app = Flask(__name__)
