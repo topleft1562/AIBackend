@@ -99,7 +99,10 @@ def handle_dispatch():
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
             reload_options = {
-                other["pickupCity"]: DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]))
+                f"load_{other['load_id']}": {
+                    "pickup": other["pickupCity"],
+                    "distance": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]))
+                }
                 for other in loads if other["load_id"] != load["load_id"]
             }
 
@@ -110,7 +113,11 @@ def handle_dispatch():
                 "deadhead_km": 0 if base == pickup else DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
-                "reload_options": reload_options
+                "reload_options": reload_options,
+                "empty_to_reload_km": {
+                    f"load_{other['load_id']}": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]))
+                    for other in loads if other["load_id"] != load["load_id"]
+                }
             })
 
             print(f"results: {result}")
@@ -127,7 +134,8 @@ def handle_dispatch():
             "- deadhead distance (from base to pickup)\n"
             "- loaded distance (from pickup to dropoff)\n"
             "- return distance (from dropoff to base)\n"
-            "- reload options (distance from current dropoff to other pickup cities)\n\n"
+            "- reload options (each load ID with pickup and distance from previous dropoff)\n"
+            "- empty_to_reload_km: required empty distance if reloading into that load\n\n"
             "Expected Output:\n"
             "- For each driver:\n"
             "  - Route (list of load IDs)\n"
