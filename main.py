@@ -149,6 +149,7 @@ def handle_dispatch():
             "- reload options (distance from current dropoff to other pickup cities)\n\n"
             "Constraints:\n"
             "- Drivers should minimize total distance.\n"
+            "- Drivers should minimize empty miles ( not loaded ).\n"
             "- Try to chain reloads based on proximity (use reload options).\n"
             "- Each load can only be completed once.\n"
             "- A driver should ideally end back at base (Brandon, MB).\n\n"
