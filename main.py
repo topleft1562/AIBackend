@@ -1,16 +1,17 @@
 import os
 import json
 import requests
-from flask import Flask, request, jsonify
 from urllib.parse import unquote, quote
-from agent_engine import get_agent_runner
-from flask import render_template_string
-from flask import render_template
+from agent_engine import get_agent_runner, get_route_assessor
+from flask import Flask, Blueprint, request, jsonify, render_template, render_template_string
+from main import normalize_city, get_distances_batch, DISTANCE_CACHE
+from collections import defaultdict
 
 app = Flask(__name__)
 
 # Initialize Dispatchy agent
 agent = get_agent_runner()
+agent2 = get_route_assessor()
 
 # Google API key
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
@@ -183,9 +184,122 @@ def handle_dispatch():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/optimize-routes", methods=["POST"])
+def optimize_routes():
+    data = request.json
+    predefined_routes = data.get("routes", [])
+    base_location = normalize_city(data.get("base", "Brandon, MB"))
+    loads = data.get("loads", [])
+
+    if not predefined_routes or not loads:
+        return jsonify({"error": "Missing 'routes' or 'loads' in request."}), 400
+
+    # Normalize and enrich load info
+    load_map = {}
+    city_pairs = set()
+
+    for i, load in enumerate(loads):
+        load_id = i + 1
+        pickup = normalize_city(load["pickupCity"])
+        dropoff = normalize_city(load["dropoffCity"])
+        load_map[load_id] = {
+            "load_id": load_id,
+            "pickup": pickup,
+            "dropoff": dropoff
+        }
+        city_pairs.update({
+            (base_location, pickup),
+            (pickup, dropoff),
+            (dropoff, base_location)
+        })
+
+    # Build reload options
+    for a in load_map.values():
+        for b in load_map.values():
+            if a["pickup"] != b["pickup"]:
+                city_pairs.add((a["dropoff"], b["pickup"]))
+
+    # Fetch distances
+    origin_dest_map = defaultdict(set)
+    for origin, dest in city_pairs:
+        origin_dest_map[origin].add(dest)
+    for origin, dests in origin_dest_map.items():
+        get_distances_batch(origin, list(dests))
+
+    # Enrich all loads with distance info
+    for load in load_map.values():
+        load["deadhead_km"] = DISTANCE_CACHE.get(f"{base_location}|{load['pickup']}")
+        load["loaded_km"] = DISTANCE_CACHE.get(f"{load['pickup']}|{load['dropoff']}")
+        load["return_km"] = DISTANCE_CACHE.get(f"{load['dropoff']}|{base_location}")
+        load["reload_options"] = {
+            b["pickup"]: DISTANCE_CACHE.get(f"{load['dropoff']}|{b['pickup']}")
+            for b in load_map.values() if b["pickup"] != load["pickup"]
+        }
+
+    # Construct enriched route breakdowns
+    enriched_routes = []
+    for route in predefined_routes:
+        driver_id = route["driver"]
+        load_ids = route["load_ids"]
+        total_empty = 0
+        total_loaded = 0
+        total_hours = 0
+        num_loads = len(load_ids)
+
+        ordered = [load_map[lid] for lid in load_ids]
+
+        # Deadhead: base to first pickup
+        total_empty += DISTANCE_CACHE.get(f"{base_location}|{ordered[0]['pickup']}", 0)
+
+        for i in range(len(ordered)):
+            a = ordered[i]
+            total_loaded += a["loaded_km"] or 0
+            if i < len(ordered) - 1:
+                b = ordered[i + 1]
+                total_empty += DISTANCE_CACHE.get(f"{a['dropoff']}|{b['pickup']}", 0)
+            else:
+                # Return to base after last dropoff
+                total_empty += DISTANCE_CACHE.get(f"{a['dropoff']}|{base_location}", 0)
+
+        total_km = total_empty + total_loaded
+        loaded_percent = round((total_loaded / total_km) * 100, 1) if total_km else 0
+        travel_hours = total_km / 80
+        load_hours = num_loads * 2
+        total_hours = round(travel_hours + load_hours, 2)
+
+        enriched_routes.append({
+            "driver": driver_id,
+            "load_ids": load_ids,
+            "total_empty_km": round(total_empty, 1),
+            "total_loaded_km": round(total_loaded, 1),
+            "loaded_percent": loaded_percent,
+            "estimated_hours": total_hours
+        })
+
+    # Send to agent for analysis
+    message = (
+        "You are Dispatchy, a route assessment and optimization specialist.\n\n"
+        "Here are the current driver assignments with actual calculated distance and time data.\n"
+        "Assess if any routes could be improved, consolidated, or made more efficient.\n"
+        "Only make changes if they will reduce total empty km or improve loaded %.\n\n"
+        "Base location: " + base_location + "\n\n"
+        f"Detailed routes:\n{json.dumps(enriched_routes, indent=2)}"
+    )
+
+    response = agent2.chat(message)
+    html_output = response.response.replace("\n", "<br>")
+
+    return f"<html><body><h2>Route Optimization Review</h2><p style='font-family: monospace;'>{html_output}</p></body></html>"
+
+
+
 @app.route("/")
 def show_form():
     return render_template("dispatch_form.html")
+
+@route_optimizer.route("/optimize", methods=["GET"])
+def optimize_form():
+    return render_template("optimize_form.html")
 
 # Start the Flask server
 if __name__ == "__main__":

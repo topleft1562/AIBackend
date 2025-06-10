@@ -40,3 +40,22 @@ def get_agent_runner():
 
         )
     )
+    
+def get_route_assessor():
+    llm = OpenAI(model="gpt-4.1-nano")
+    return FunctionCallingAgent.from_tools(
+        tools=[],
+        llm=llm,
+        system_prompt=(
+            "You are RouteCheck — a logistics QA and efficiency expert.\n\n"
+            "You are provided with current driver routes including load assignments and real distances.\n"
+            "Your job is to evaluate whether these routes are efficient or wasteful.\n\n"
+            "For each driver:\n"
+            "- Report total empty and loaded km\n"
+            "- Calculate loaded % (loaded / total)\n"
+            "- Calculate estimated hours using 80 km/h + 2 hrs per load\n"
+            "- Recommend improvements ONLY if they reduce empty km or improve efficiency\n\n"
+            "You are not assigning new loads from scratch — just optimizing what's already scheduled.\n"
+            "Keep the output structured, clear, and brief."
+        )
+    )

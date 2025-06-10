@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Optimize Driver Routes</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        textarea { width: 100%; height: 200px; }
+        input[type="text"] { width: 100%; }
+        button { margin-top: 10px; padding: 10px 20px; }
+        .section { margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <h2>Route Optimization Tool</h2>
+    <form id="optimizeForm">
+        <div class="section">
+            <label><strong>Base Location:</strong></label><br>
+            <input type="text" name="base" value="Brandon, MB" required>
+        </div>
+
+        <div class="section">
+            <label><strong>Loads:</strong> (Array of pickup/dropoff)</label><br>
+            <textarea name="loads">[
+  { "pickupCity": "Brandon, MB", "dropoffCity": "Belle Plaine, SK" },
+  { "pickupCity": "Belle Plaine, SK", "dropoffCity": "Brandon, MB" }
+]</textarea>
+        </div>
+
+        <div class="section">
+            <label><strong>Routes:</strong> (Array of driver to load ID assignments)</label><br>
+            <textarea name="routes">[
+  { "driver": "Driver 1", "load_ids": [1] },
+  { "driver": "Driver 2", "load_ids": [2] }
+]</textarea>
+        </div>
+
+        <button type="submit">Optimize Routes</button>
+    </form>
+
+    <div id="result" style="margin-top:30px;"></div>
+
+    <script>
+        document.getElementById("optimizeForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const base = this.base.value;
+            const loads = JSON.parse(this.loads.value);
+            const routes = JSON.parse(this.routes.value);
+
+            const response = await fetch("/optimize-routes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base, loads, routes })
+            });
+
+            const html = await response.text();
+            document.getElementById("result").innerHTML = html;
+        });
+    </script>
+</body>
+</html>
