@@ -3,8 +3,14 @@ import json
 import requests
 from flask import Flask, request, jsonify
 from urllib.parse import unquote, quote
+from agent_engine import get_agent_runner
+from flask import render_template_string
+
 
 app = Flask(__name__)
+
+# Initialize Dispatchy agent
+agent = get_agent_runner()
 
 # Google API key
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
@@ -130,7 +136,32 @@ def handle_dispatch():
                 "reload_options": reload_options
             })
 
-        return jsonify({"enriched_loads": result})
+        formatted_message = (
+            "You are a dispatch optimization assistant.\n\n"
+            "The goal is to assign the fewest number of drivers possible to complete all the loads below. "
+            "Each driver starts and ends at the base location: Brandon, MB.\n\n"
+            "Each load includes:\n"
+            "- pickup city\n"
+            "- dropoff city\n"
+            "- deadhead distance (from base to pickup)\n"
+            "- loaded distance (from pickup to dropoff)\n"
+            "- return distance (from dropoff to base)\n"
+            "- reload options (distance from current dropoff to other pickup cities)\n\n"
+            "Constraints:\n"
+            "- Drivers should minimize total distance.\n"
+            "- Try to chain reloads based on proximity (use reload options).\n"
+            "- Each load can only be completed once.\n"
+            "- A driver should ideally end back at base (Brandon, MB).\n\n"
+            f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
+)
+
+        response = agent.chat(formatted_message)
+
+        html_output = response.response.replace("\n", "<br>")
+
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
+
+       
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
