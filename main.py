@@ -179,7 +179,6 @@ def handle_dispatch():
             "- If a dropoff city is the same as another pickup, it must be chained.\n"
             "- The goal is not to return to base after each load, but only once the route is complete.\n"
             "- Minimum 70% loaded km per driver.\n"
-            "- If a load’s dropoff city matches another’s pickup, this should be treated as one continuous loaded trip. The km between them should not count as empty. Dispatch accordingly.\n"
             "- If any loads are not planned, output them as Unassigned loads.\n"
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
 )
