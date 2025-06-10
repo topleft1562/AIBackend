@@ -113,6 +113,8 @@ def handle_dispatch():
                 "reload_options": reload_options
             })
 
+            print(f"results: {result}")
+
         formatted_message = (
             "You are Dispatchy — an efficient AI dispatcher.\n\n"
             "The objective is simple:\n"
