@@ -52,9 +52,10 @@ def handle_dispatch():
         data = request.json
         loads = data.get("loads", [])
         base_location = data.get("base", "Brandon,MB")
-        
+
     else:
         loads_param = request.args.get("loads")
+        base_location = request.args.get("base", "Brandon,MB")
         try:
             loads = json.loads(unquote(loads_param)) if loads_param else []
         except:
