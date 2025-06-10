@@ -4,10 +4,10 @@
     <title>Optimize Driver Routes</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        textarea { width: 100%; height: 200px; }
-        input[type="text"] { width: 100%; }
+        textarea, input[type="text"] { width: 100%; margin-bottom: 10px; }
         button { margin-top: 10px; padding: 10px 20px; }
         .section { margin-bottom: 30px; }
+        .driver-section { padding: 10px; background: #fff; border: 1px solid #ccc; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -19,19 +19,29 @@
         </div>
 
         <div class="section">
-            <label><strong>Loads:</strong> (Array of pickup/dropoff)</label><br>
-            <textarea name="loads">[
-  { "pickupCity": "Brandon, MB", "dropoffCity": "Belle Plaine, SK" },
-  { "pickupCity": "Belle Plaine, SK", "dropoffCity": "Brandon, MB" }
-]</textarea>
+            <label><strong>Loads:</strong></label>
+            <div id="loadList">
+                <div>
+                    <input type="text" placeholder="Pickup City" class="pickup" required>
+                    <input type="text" placeholder="Dropoff City" class="dropoff" required>
+                </div>
+            </div>
+            <button type="button" onclick="addLoad()">➕ Add Load</button>
         </div>
 
         <div class="section">
-            <label><strong>Routes:</strong> (Array of driver to load ID assignments)</label><br>
-            <textarea name="routes">[
-  { "driver": "Driver 1", "load_ids": [1] },
-  { "driver": "Driver 2", "load_ids": [2] }
-]</textarea>
+            <label><strong>Driver Routes:</strong></label>
+            <div id="routeList">
+                <div class="driver-section">
+                    <input type="text" placeholder="Driver Name" class="driverName" required>
+                    <div class="routeEntries">
+                        <input type="text" placeholder="Pickup City" class="pickup" required>
+                        <input type="text" placeholder="Dropoff City" class="dropoff" required>
+                    </div>
+                    <button type="button" onclick="addRouteEntry(this)">➕ Add Another Load</button>
+                </div>
+            </div>
+            <button type="button" onclick="addDriver()">➕ Add Driver</button>
         </div>
 
         <button type="submit">Optimize Routes</button>
@@ -40,11 +50,76 @@
     <div id="result" style="margin-top:30px;"></div>
 
     <script>
+        function addLoad() {
+            const div = document.createElement("div");
+            div.innerHTML = `
+                <input type="text" placeholder="Pickup City" class="pickup" required>
+                <input type="text" placeholder="Dropoff City" class="dropoff" required>
+            `;
+            document.getElementById("loadList").appendChild(div);
+        }
+
+        function addDriver() {
+            const section = document.createElement("div");
+            section.className = "driver-section";
+            section.innerHTML = `
+                <input type="text" placeholder="Driver Name" class="driverName" required>
+                <div class="routeEntries">
+                    <input type="text" placeholder="Pickup City" class="pickup" required>
+                    <input type="text" placeholder="Dropoff City" class="dropoff" required>
+                </div>
+                <button type="button" onclick="addRouteEntry(this)">➕ Add Another Load</button>
+            `;
+            document.getElementById("routeList").appendChild(section);
+        }
+
+        function addRouteEntry(button) {
+            const entries = button.parentElement.querySelector(".routeEntries");
+            const entry = document.createElement("div");
+            entry.innerHTML = `
+                <input type="text" placeholder="Pickup City" class="pickup" required>
+                <input type="text" placeholder="Dropoff City" class="dropoff" required>
+            `;
+            entries.appendChild(entry);
+        }
+
         document.getElementById("optimizeForm").addEventListener("submit", async function(e) {
             e.preventDefault();
-            const base = this.base.value;
-            const loads = JSON.parse(this.loads.value);
-            const routes = JSON.parse(this.routes.value);
+
+            const base = this.base.value.trim();
+            const pickupEls = document.querySelectorAll("#loadList .pickup");
+            const dropoffEls = document.querySelectorAll("#loadList .dropoff");
+
+            const loads = [];
+            for (let i = 0; i < pickupEls.length; i++) {
+                loads.push({
+                    pickupCity: pickupEls[i].value.trim(),
+                    dropoffCity: dropoffEls[i].value.trim()
+                });
+            }
+
+            const loadMap = {};
+            loads.forEach((l, idx) => {
+                loadMap[`${l.pickupCity}|${l.dropoffCity}`] = idx + 1;
+            });
+
+            const drivers = document.querySelectorAll(".driver-section");
+            const routes = [];
+
+            drivers.forEach(section => {
+                const driverName = section.querySelector(".driverName").value.trim();
+                const pickups = section.querySelectorAll(".routeEntries .pickup");
+                const dropoffs = section.querySelectorAll(".routeEntries .dropoff");
+
+                const load_ids = [];
+                for (let i = 0; i < pickups.length; i++) {
+                    const key = `${pickups[i].value.trim()}|${dropoffs[i].value.trim()}`;
+                    const id = loadMap[key];
+                    if (id) load_ids.push(id);
+                }
+
+                routes.push({ driver: driverName, load_ids });
+            });
 
             const response = await fetch("/optimize-routes", {
                 method: "POST",
