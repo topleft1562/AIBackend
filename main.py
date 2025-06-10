@@ -153,12 +153,16 @@ def handle_dispatch():
             "- Try to chain reloads based on proximity (use reload options).\n"
             "- Each load can only be completed once.\n"
             "- A driver should ideally end back at base (Brandon, MB).\n\n"
-            "OutPut needs - Per Driver"
+            "OutPut needs - Per Driver\n"
             "- Total Km's empty\n"
             "- Total Km's Loaded\n"
             "- Loaded %\n"
             "- Approx hours used in cycle ( 70/36 )\n"
-            " -- 80km\h avg & 1.5 hrs to load and unload.\n"
+            " -- 80km\h avg & 1.5 hrs to load and unload.\n\n"
+            "Extra's\n"
+            "- Give suggestions for places to look for loads to/from to reduce empty kms\n"
+            "ex: If there are empty miles over 100km's\n\n"
+            
             f"Here is the list of enriched loads:\n{json.dumps(result, indent=2)}"
 )
 
