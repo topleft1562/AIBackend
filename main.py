@@ -62,18 +62,40 @@ def handle_dispatch():
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        # Step 1: Normalize and collect all unique points
+        # Normalize and collect cities
         for load in loads:
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
 
-        all_points = set()
-        for load in loads:
-            all_points.add(load["pickupCity"])
-            all_points.add(load["dropoffCity"])
+        base = normalize_city(base_location)
+        pickup_cities = [load["pickupCity"] for load in loads]
+        dropoff_cities = [load["dropoffCity"] for load in loads]
 
-        all_points = list(all_points)
-        pairs_to_fetch = [(o, d) for o in all_points for d in all_points if o != d and (o, d) not in DISTANCE_CACHE]
+        # Build unique distance pairs we need
+        pairs_to_fetch = set()
+
+        # 1. Base → pickup
+        for pickup in pickup_cities:
+            if (base, pickup) not in DISTANCE_CACHE and base != pickup:
+                pairs_to_fetch.add((base, pickup))
+
+        # 2. Pickup → dropoff
+        for load in loads:
+            pair = (load["pickupCity"], load["dropoffCity"])
+            if pair not in DISTANCE_CACHE and pair[0] != pair[1]:
+                pairs_to_fetch.add(pair)
+
+        # 3. Dropoff → pickup (reloads)
+        for dropoff in dropoff_cities:
+            for pickup in pickup_cities:
+                if dropoff != pickup and (dropoff, pickup) not in DISTANCE_CACHE:
+                    pairs_to_fetch.add((dropoff, pickup))
+
+        # 4. Dropoff → base (return to home)
+        for dropoff in dropoff_cities:
+            if (dropoff, base) not in DISTANCE_CACHE and dropoff != base:
+                pairs_to_fetch.add((dropoff, base))
+
 
         # Step 2: Fetch all required distances in batches
         batch_size = 10
