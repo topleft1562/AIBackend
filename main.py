@@ -129,6 +129,7 @@ def handle_dispatch():
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
             "- Maximize revenue per mile (RPM) per driver.\n\n"
+            "- Each load can only be used once.\n"
             "Format all tables in the response as HTML tables (use <table>, <tr>, <th>, <td>). Do NOT use Markdown or plain text tables.\n"
             "Revenue Instructions:\n"
             "- Each load has a `revenue` field (pre-calculated as rate x weight, in dollars).\n"
@@ -144,7 +145,7 @@ def handle_dispatch():
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
             "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
-            "- You do not have to use every load, only ones that make sense."
+            "- You do not have to use every load, only ones that make sense.\n"
             f"Here is the enriched dispatch data (base and all loads):\n{json.dumps(enriched_data, indent=2)}"
         )
 
