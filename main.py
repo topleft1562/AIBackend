@@ -150,7 +150,7 @@ def handle_dispatch():
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{map_html}<p style='font-family: monospace;'>{html_output}</p></body></html>")
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
