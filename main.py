@@ -117,10 +117,14 @@ def handle_dispatch():
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
                 "reload_options": reload_options,
             })
+        enriched_data = {
+           "base": base,
+            "loads": result
+        }
 
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "The base location for these drivers is {base_location}\n"
+            f"BASE LOCATION: {base}\n"
             "GOALS:\n"
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
@@ -140,7 +144,7 @@ def handle_dispatch():
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
             "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
-            f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
+            f"Here is the enriched dispatch data (base and all loads):\n{json.dumps(enriched_data, indent=2)}"
         )
 
         response = agent.chat(prompt)
