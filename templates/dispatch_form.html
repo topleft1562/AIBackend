@@ -19,10 +19,8 @@
       margin-right: 0;
       text-align: left;
     }
-    /* Special width for X button */
     .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
     .load-row button { margin-left: 5px; min-width: 32px; }
-    /* Spinner style */
     #spinner {
       display: none;
       margin: 30px auto;
@@ -37,8 +35,11 @@
 <body>
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
-    <label for="base">Base Location:</label>
+    <label for="base">Start Location:</label>
     <input type="text" id="base" name="base" placeholder="Starting Point" required />
+
+    <label for="end">End Location:</label>
+    <input type="text" id="end" name="end" placeholder="Ending Point" required />
 
     <h3>Loads</h3>
     <div class="load-header">
@@ -115,6 +116,7 @@
 
       const form = e.target;
       const base = form.base.value.trim();
+      const end = form.end.value.trim();
       const pickups = form.querySelectorAll("input[name='pickup']");
       const dropoffs = form.querySelectorAll("input[name='dropoff']");
       const counts = form.querySelectorAll("input[name='count']");
@@ -137,7 +139,7 @@
         const response = await fetch("/dispatch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base, loads })
+          body: JSON.stringify({ start: base, end: end, loads })
         });
         const html = await response.text();
         document.getElementById("output").innerHTML = html;

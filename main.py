@@ -63,13 +63,15 @@ def handle_dispatch():
     
     data = request.json
     loads = data.get("loads", [])
-    base_location = data.get("base", "Brandon, MB")
+    start_location = data.get("start", "Brandon, MB")
+    end_location = data.get("end", "Brandon, MB")
     
     if not loads:
         return jsonify({"error": "Missing loads in request."}), 400
 
     try:
-        base = normalize_city(base_location)
+        start = normalize_city(start_location)
+        end = normalize_city(end_location)
 
         for i, load in enumerate(loads):
             load["load_id"] = i + 1
@@ -84,7 +86,7 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            city_pairs.update({(base, pickup), (pickup, dropoff), (dropoff, base)})
+            city_pairs.update({(start, pickup), (pickup, dropoff), (dropoff, end)})
             for other in loads:
                 city_pairs.add((dropoff, other["pickupCity"]))
 
@@ -112,24 +114,25 @@ def handle_dispatch():
                 "pickup": pickup,
                 "dropoff": dropoff,
                 "revenue": load["revenue"],
-                "deadhead_km": DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
+                "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
-                "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
+                "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
                 "reload_options": reload_options,
             })
         enriched_data = {
-           "base": base,
+           "start_location": start,
+           "end_location": end,
             "loads": result
         }
 
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            f"BASE LOCATION: {base}\n"
+            f"START LOCATION: {start}\n"
+            f"END LOCATION: {end}\n"
             "GOALS:\n"
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
             "- Maximize revenue per mile (RPM) per driver.\n\n"
-            "- Each load can only be used once.\n"
             "Format all tables in the response as HTML tables (use <table>, <tr>, <th>, <td>). Do NOT use Markdown or plain text tables.\n"
             "Revenue Instructions:\n"
             "- Each load has a `revenue` field (pre-calculated as rate x weight, in dollars).\n"
@@ -137,16 +140,17 @@ def handle_dispatch():
             "- Convert total kilometers to miles (1 km = 0.621371 miles).\n"
             "- For each driver: RPM = total revenue / (total km * 0.621371)\n\n"
             "Instructions:\n"
-            "- Drivers must start at base and end at base once full route is done.\n"
-            "- Chain loads together when possible to avoid unnecessary returns to base (using reload_options).\n"
-            "- Do not return to base unless the route is completed.\n"
+            "- Drivers must start at start_location and end at end_location once full route is done.\n"
+            "- Chain loads together when possible to avoid unnecessary returns to end_location (using reload_options).\n"
+            "- Do not return to end_location unless the route is completed.\n"
             "- For each driver: list assigned loads by load_id, with pickup, dropoff, loaded km, rate, weight, revenue for each.\n"
             "- Show totals per driver: loaded km, empty km, total km, loaded %, **total revenue**, and **RPM**.\n"
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
             "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
             "- You do not have to use every load, only ones that make sense.\n"
-            f"Here is the enriched dispatch data (base and all loads):\n{json.dumps(enriched_data, indent=2)}"
+            "- Each load can only be used once.\n"
+            f"Here is the enriched dispatch data (start_location, end_location and all loads):\n{json.dumps(enriched_data, indent=2)}"
         )
 
         response = agent.chat(prompt)
