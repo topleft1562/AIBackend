@@ -140,7 +140,6 @@ def handle_dispatch():
             "- For each driver: RPM = total revenue / (total km * 0.621371)\n\n"
             "Instructions:\n"
             "- Drivers must start at base and end at base once full route is done.\n"
-            "- include all km's including return to base from final load in route in calculations."
             "- Chain loads together when possible to avoid unnecessary returns to base (using reload_options).\n"
             "- Do not return to base unless the route is completed.\n"
             "- For each driver: list assigned loads by load_id, with pickup, dropoff, loaded km, rate, weight, revenue for each.\n"
