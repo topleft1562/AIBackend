@@ -95,7 +95,6 @@ def handle_dispatch():
             get_distances_batch(origin, list(dests))
 
         result = []
-        pins = set()
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
