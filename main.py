@@ -82,6 +82,9 @@ def handle_dispatch():
             load["load_id"] = i + 1
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            # Pass rate through
+            load["rate"] = float(load.get("rate", 0))
+
 
         city_pairs = set()
         for load in loads:
@@ -115,6 +118,7 @@ def handle_dispatch():
                 "load_id": load["load_id"],
                 "pickup": pickup,
                 "dropoff": dropoff,
+                "rate": load["rate"],
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
@@ -123,23 +127,26 @@ def handle_dispatch():
 
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "GOAL: Minimize total empty kilometers across all drivers.\n"
-            "Guidelines:\n"
-            "- Each driver starts and ends at base. Each load shows deadhead_km( from base for first load), and return_km ( back to base for final load ) \n"
-            "- Do not return to base, unless entire route is completed.\n"
-            "- using the load data below, calculate the best PLAN with the least amount of drivers possible.\n"
-            "- Chain as many loads together as possible using the reload options.\n"
-            "Each load includes:\n"
-            "- pickup and dropoff\n"
-            "- deadhead km from base\n"
-            "- loaded km\n"
-            "- return km back to base\n"
-            "- reload options: list of other loads and distance to their pickup\n\n"
-            "Please return:\n"
-            "- Driver-by-driver breakdown: list of loads, loaded km, empty km, loaded %, total km\n"
-            "- Suggestions to improve load chaining\n"
-            "- Highlight unassigned loads, if any\n"
-            f"\nHere is the enriched load data:\n{json.dumps(result, indent=2)}"
+            "GOALS:\n"
+            "- Minimize total empty kilometers across all drivers.\n"
+            "- Assign all loads using as few drivers as possible.\n"
+            "- Maximize revenue per mile (RPM) per driver.\n\n"
+            "Revenue Instructions:\n"
+            "- Each load has a `rate` (dollars/MT)."
+            "- For each load: revenue = rate x 43 x loaded_km"
+            "- For each driver: total revenue = sum of assigned loads' revenue."
+            "- Convert total kilometers to miles (1 km = 0.621371 miles)."
+            "- For each driver: RPM = total revenue / (total km * 0.621371)\n\n"
+            "Instructions:\n"
+            "- Drivers must start at base and end at or near base.\n"
+            "- Chain loads together when possible to avoid unnecessary returns to base (using reload_options).\n"
+            "- Do not return to base unless the route is completed.\n"
+            "- For each driver: list assigned loads by load_id, with pickup, dropoff, loaded km, rate, revenue for each.\n"
+            "- Show totals per driver: loaded km, empty km, total km, loaded %, **total revenue**, and **RPM**.\n"
+            "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
+            "- List unassigned loads (if any), with their rates and potential revenue.\n"
+            "- Suggest any improvements if possible.\n\n"
+            f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
 
         response = agent.chat(prompt)
