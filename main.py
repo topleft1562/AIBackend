@@ -131,8 +131,13 @@ def handle_dispatch():
             "Rules:\n"
             "- All drivers start at the base and should end at or near the base.\n"
             "- Loads may be done in any order.\n"
-            "- Chain loads together when possible to avoid unnecessary returns to base.\n"
-            "- Use the provided distances: deadhead (base to pickup), loaded (pickup to dropoff), return (dropoff to base), and reload options (distance between dropoff and another load's pickup).\n\n"
+            "- You must chain loads using the `reload_options` provided — these represent valid transitions between loads.\n"
+            "- Never assume a dropoff can teleport to the next pickup — always use the `deadhead_from_this_dropoff` value for that jump.\n\n"
+            "- Use the provided distances:\n"
+            "  * `deadhead_km` — base to first pickup\n"
+            "  * `loaded_km` — pickup to dropoff\n"
+            "  * `return_km` — dropoff to base\n"
+            "  * `reload_options` — distances between dropoff of this load and pickup of another\n\n"
             "Return:\n"
             "- A clear driver-by-driver breakdown:\n"
             "    * List of assigned load IDs in order\n"
@@ -143,6 +148,7 @@ def handle_dispatch():
             "- Suggestions to improve efficiency\n\n"
             f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
+
 
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
