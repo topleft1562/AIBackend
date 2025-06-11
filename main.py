@@ -121,7 +121,6 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            loaded_km = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
             reload_options = {
                 f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
@@ -135,47 +134,42 @@ def handle_dispatch():
                 "pickup": pickup,
                 "dropoff": dropoff,
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
-                "loaded_km": round(loaded_km, 1),
+                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
                 "reload_options": reload_options,
             })
 
             pins.update({pickup, dropoff})
 
-        pin_coords = {
-            city: get_coordinates(city) for city in pins
-        }
+        pin_coords = {city: get_coordinates(city) for city in pins}
 
-        formatted_message = (
+        prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "GOAL: Minimize empty km across all drivers.\n"
-            "Rules:\n"
-            "- Return to base after all loads.\n"
-            "- Use as few drivers as possible.\n"
-            "- You can reorder the loads.\n"
-            "- You can chain loads by using reload_options.\n"
-            "- If a dropoff is near another pickup (evaluate using reload_options distance), it's valid to chain.\n"
-            "- Never assume a load is 0 km unless pickup == dropoff.\n"
-            "- Always report each driver's full empty km and full loaded km.\n"
-            "- Do not ignore short or local chains (e.g., Belle Plaine ↔ Lajord).\n"
-            "- Prefer total plans with lowest total empty km even if loaded % < 70%.\n\n"
+            "GOAL: Minimize total empty kilometers across all drivers.\n"
+            "Guidelines:\n"
+            "- Each driver starts and ends at base.\n"
+            "- You may reorder loads freely to optimize efficiency.\n"
+            "- Chain loads together when a dropoff is reasonably close to the next pickup.\n"
+            "- Use reload_options for potential chaining.\n"
+            "- Prefer chaining multiple loads per driver rather than assigning new drivers.\n"
+            "- Report accurate loaded and empty km.\n"
+            "- No arbitrary assumptions: use provided km for deadhead, loaded, and return.\n\n"
             "Each load includes:\n"
-            "- pickup, dropoff\n"
-            "- deadhead from base\n"
+            "- pickup and dropoff\n"
+            "- deadhead km from base\n"
             "- loaded km\n"
-            "- return to base km\n"
-            "- reload options: list of next pickups and distance from previous dropoff\n\n"
+            "- return km back to base\n"
+            "- reload options: list of other loads and distance to their pickup\n\n"
             "Please return:\n"
-            "- Driver-by-driver breakdown: load sequence, loaded km, empty km, loaded %\n"
-            "- Total km driven\n"
-            "- Missed reload opportunities or suggestions for improving chains\n\n"
-            f"Loads:\n{json.dumps(result, indent=2)}"
+            "- Driver-by-driver breakdown: list of loads, loaded km, empty km, loaded %, total km\n"
+            "- Suggestions to improve load chaining\n"
+            "- Highlight unassigned loads, if any\n"
+            f"\nHere is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
 
-        response = agent.chat(formatted_message)
+        response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        # Add a basic map
         pin_markers = [
             f"new google.maps.Marker({{ position: {{ lat: {lat}, lng: {lng} }}, map: map, title: '{city}' }});"
             for city, (lat, lng) in pin_coords.items() if lat and lng
