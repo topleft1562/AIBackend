@@ -124,29 +124,24 @@ def handle_dispatch():
         
         print(f"results: {result}")
         prompt = (
-            "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "GOAL: Minimize total empty kilometers across all drivers.\n"
-            "Guidelines:\n"
-            "- Each driver starts and ends at base.\n"
-            "- You may reorder loads freely to optimize efficiency.\n"
-            "- Chain loads together when a dropoff is reasonably close to the next pickup.\n"
-            "- Use reload_options for potential chaining.\n"
-            "- Prefer chaining multiple loads per driver rather than assigning new drivers.\n"
-            "- Report accurate loaded and empty km.\n"
-            "- Drivers must start and end as close to base as possible. If possible, end at base.\n"
-            "- No arbitrary assumptions: use provided km for deadhead, loaded, and return.\n\n"
-            "Each load includes:\n"
-            "- pickup and dropoff\n"
-            "- deadhead km from base\n"
-            "- loaded km\n"
-            "- return km back to base\n"
-            "- reload options: list of other loads and distance to their pickup\n\n"
-            "Please return:\n"
-            "- Driver-by-driver breakdown: list of loads, loaded km, empty km, loaded %, total km\n"
-            "- Suggestions to improve load chaining\n"
-            "- Highlight unassigned loads, if any\n"
-            f"\nHere is the enriched load data:\n{json.dumps(result, indent=2)}"
-        )
+    "You are Dispatchy — an elite logistics planner.\n\n"
+    "Your job is to assign all loads to the fewest drivers possible while minimizing empty kilometers.\n\n"
+    "Rules:\n"
+    "- All drivers start at the base and should end at or near the base.\n"
+    "- Loads may be done in any order.\n"
+    "- Chain loads together when possible to avoid unnecessary returns to base.\n"
+    "- Use the provided distances: deadhead (base to pickup), loaded (pickup to dropoff), return (dropoff to base), and reload options (distance between dropoff and another load's pickup).\n\n"
+    "Return:\n"
+    "- A clear driver-by-driver breakdown:\n"
+    "    * List of assigned load IDs in order\n"
+    "    * Pickup and dropoff cities per load\n"
+    "    * Deadhead, loaded, return, and total km\n"
+    "    * Final loaded % per driver\n"
+    "- Any unassigned loads (if any)\n"
+    "- Suggestions to improve efficiency\n\n"
+    f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
+)
+
 
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
