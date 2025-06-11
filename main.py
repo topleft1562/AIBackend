@@ -144,6 +144,7 @@ def handle_dispatch():
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
             "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
+            "- You do not have to use every load, only ones that make sense."
             f"Here is the enriched dispatch data (base and all loads):\n{json.dumps(enriched_data, indent=2)}"
         )
 
