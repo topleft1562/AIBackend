@@ -121,8 +121,8 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
-            print(f"results: {result}")
-
+        
+        print(f"results: {result}")
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
             "GOAL: Minimize total empty kilometers across all drivers.\n"
