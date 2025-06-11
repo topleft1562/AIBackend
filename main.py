@@ -240,38 +240,39 @@ def direct_route_multi():
         all_results.append(table_html)
 
     html = """
-    <html>
-    <head>
-        <style>
-            table {
-                border-collapse: collapse;
-                margin: 20px 0;
-                font-size: 15px;
-                width: 100%;
-                background: #fff;
-            }
-            th, td {
-                border: 1px solid #bbb;
-                padding: 6px 10px;
-                text-align: center;
-            }
-            th {
-                background: #f4f4f4;
-            }
-            .route-title {
-                font-weight: bold;
-                font-size: 18px;
-                margin-top: 22px;
-                margin-bottom: 8px;
-            }
-        </style>
-    </head>
-    <body>
-        <h2>Direct Route Comparison</h2>
-        {}
-    </body>
-    </html>
-    """.format("".join(all_results))
+<html>
+<head>
+    <style>
+        table {{
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 15px;
+            width: 100%;
+            background: #fff;
+        }}
+        th, td {{
+            border: 1px solid #bbb;
+            padding: 6px 10px;
+            text-align: center;
+        }}
+        th {{
+            background: #f4f4f4;
+        }}
+        .route-title {{
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }}
+    </style>
+</head>
+<body>
+    <h2>Direct Route Comparison</h2>
+    {}
+</body>
+</html>
+""".format("".join(all_results))
+
 
     return html
 
