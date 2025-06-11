@@ -28,6 +28,24 @@ def get_distance_key(origin, destination):
     sorted_pair = sorted([normalize_city(origin), normalize_city(destination)])
     return f"{sorted_pair[0]}|{sorted_pair[1]}"
 
+def get_coordinates(city):
+    city = normalize_city(city)
+    if city in COORD_CACHE:
+        return COORD_CACHE[city]
+
+    url = "https://maps.googleapis.com/maps/api/geocode/json"
+    params = {"address": city, "key": GOOGLE_KEY}
+    try:
+        res = requests.get(url, params=params)
+        data = res.json()
+        if data.get("results"):
+            location = data["results"][0]["geometry"]["location"]
+            latlng = (location["lat"], location["lng"])
+            COORD_CACHE[city] = latlng
+            return latlng
+    except:
+        pass
+    return None
 
 def get_distances_batch(origin, destinations):
     origin = normalize_city(origin)
@@ -121,6 +139,10 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
+            pins.update({pickup, dropoff})
+
+        pin_coords = {city: get_coordinates(city) for city in pins}
+
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
             "GOAL: Minimize total empty kilometers across all drivers.\n"
@@ -148,7 +170,27 @@ def handle_dispatch():
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
+        pin_markers = [
+            f"new google.maps.Marker({{ position: {{ lat: {lat}, lng: {lng} }}, map: map, title: '{city}' }});"
+            for city, (lat, lng) in pin_coords.items() if lat and lng
+        ]
+
+        map_html = f"""
+        <div id='map' style='height: 600px; width: 100%;'></div>
+        <script src='https://maps.googleapis.com/maps/api/js?key={GOOGLE_KEY}'></script>
+        <script>
+        function initMap() {{
+            const map = new google.maps.Map(document.getElementById('map'), {{
+                zoom: 5,
+                center: {{ lat: 50.0, lng: -100.0 }}
+            }});
+            {''.join(pin_markers)}
+        }}
+        window.onload = initMap;
+        </script>
+        """
+
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{map_html}<p style='font-family: monospace;'>{html_output}</p></body></html>")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
