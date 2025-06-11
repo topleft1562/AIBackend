@@ -58,20 +58,13 @@ def get_distances_batch(origin, destinations):
     except Exception as e:
         print(f"Error fetching from {origin} to batch: {e}")
 
-@app.route("/dispatch", methods=["GET", "POST"])
+@app.route("/dispatch", methods=["POST"])
 def handle_dispatch():
-    if request.method == "POST":
-        data = request.json
-        loads = data.get("loads", [])
-        base_location = data.get("base", "Brandon, MB")
-    else:
-        loads_param = request.args.get("loads")
-        base_location = request.args.get("base", "Brandon, MB")
-        try:
-            loads = json.loads(unquote(loads_param)) if loads_param else []
-        except:
-            return jsonify({"error": "Invalid loads format."}), 400
-
+    
+    data = request.json
+    loads = data.get("loads", [])
+    base_location = data.get("base", "Brandon, MB")
+    
     if not loads:
         return jsonify({"error": "Missing loads in request."}), 400
 
@@ -128,7 +121,7 @@ def handle_dispatch():
 
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "The base location for these drivers is {base}\n"
+            "The base location for these drivers is {base_location}\n"
             "GOALS:\n"
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
