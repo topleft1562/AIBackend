@@ -102,17 +102,14 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            reload_options = []
-            for other in loads:
-                if other["load_id"] == load["load_id"]:
-                    continue
-                reload_options.append({
-                    "next_load_id": other["load_id"],
+            reload_options = {
+                f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
-                    "dropoff": other["dropoffCity"],
                     "deadhead_from_this_dropoff": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
                     "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
-                })
+                }
+                for other in loads if other["load_id"] != load["load_id"]
+            }
 
             result.append({
                 "load_id": load["load_id"],
@@ -124,36 +121,36 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
-        print(f"results: {result}")
         prompt = (
-            "You are Dispatchy — an elite logistics planner.\n\n"
-            "Your job is to assign all loads to the fewest drivers possible while minimizing empty kilometers.\n\n"
-            "Rules:\n"
-            "- All drivers start at the base and should end at or near the base.\n"
-            "- Loads may be done in any order.\n"
-            "- You must chain loads using the `reload_options` provided — these represent valid transitions between loads.\n"
-            "- Never assume a dropoff can teleport to the next pickup — always use the `deadhead_from_this_dropoff` value for that jump.\n\n"
-            "- Use the provided distances:\n"
-            "  * `deadhead_km` — base to first pickup\n"
-            "  * `loaded_km` — pickup to dropoff\n"
-            "  * `return_km` — dropoff to base\n"
-            "  * `reload_options` — distances between dropoff of this load and pickup of another\n\n"
-            "Return:\n"
-            "- A clear driver-by-driver breakdown:\n"
-            "    * List of assigned load IDs in order\n"
-            "    * Pickup and dropoff cities per load\n"
-            "    * Deadhead, loaded, return, and total km\n"
-            "    * Final loaded % per driver\n"
-            "- Any unassigned loads (if any)\n"
-            "- Suggestions to improve efficiency\n\n"
-            f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
+            "You are Dispatchy — an elite AI logistics planner.\n\n"
+            "GOAL: Minimize total empty kilometers across all drivers.\n"
+            "Guidelines:\n"
+            "- Each driver starts and ends at base.\n"
+            "- You may reorder loads freely to optimize efficiency.\n"
+            "- Chain loads together when a dropoff is reasonably close to the next pickup.\n"
+            "- Use reload_options for potential chaining.\n"
+            "- assess each chain load individually, and find the best routes for drivers.\n"
+            "- Prefer chaining multiple loads per driver rather than assigning new drivers.\n"
+            "- Report accurate loaded and empty km.\n"
+            "- only use return km's at the end of their chained route."
+            "- No arbitrary assumptions: use provided km for deadhead, loaded, and return.\n\n"
+            "Each load includes:\n"
+            "- pickup and dropoff\n"
+            "- deadhead km from base\n"
+            "- loaded km\n"
+            "- return km back to base\n"
+            "- reload options: list of other loads and distance to their pickup\n\n"
+            "Please return:\n"
+            "- Driver-by-driver breakdown: list of loads, loaded km, empty km, loaded %, total km\n"
+            "- Suggestions to improve load chaining\n"
+            "- Highlight unassigned loads, if any\n"
+            f"\nHere is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
-
 
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{map_html}<p style='font-family: monospace;'>{html_output}</p></body></html>")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
