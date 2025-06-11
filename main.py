@@ -28,7 +28,6 @@ def get_distance_key(origin, destination):
     sorted_pair = sorted([normalize_city(origin), normalize_city(destination)])
     return f"{sorted_pair[0]}|{sorted_pair[1]}"
 
-
 def get_distances_batch(origin, destinations):
     origin = normalize_city(origin)
     destinations = [normalize_city(d) for d in destinations if d != origin]
@@ -103,13 +102,17 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            reload_options = {
-                f"load_{other['load_id']}": {
+            reload_options = []
+            for other in loads:
+                if other["load_id"] == load["load_id"]:
+                    continue
+                reload_options.append({
+                    "next_load_id": other["load_id"],
                     "pickup": other["pickupCity"],
-                    "distance": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]))
-                }
-                for other in loads if other["load_id"] != load["load_id"]
-            }
+                    "dropoff": other["dropoffCity"],
+                    "deadhead_from_this_dropoff": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                    "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                })
 
             result.append({
                 "load_id": load["load_id"],
@@ -121,27 +124,25 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
-        
         print(f"results: {result}")
         prompt = (
-    "You are Dispatchy — an elite logistics planner.\n\n"
-    "Your job is to assign all loads to the fewest drivers possible while minimizing empty kilometers.\n\n"
-    "Rules:\n"
-    "- All drivers start at the base and should end at or near the base.\n"
-    "- Loads may be done in any order.\n"
-    "- Chain loads together when possible to avoid unnecessary returns to base.\n"
-    "- Use the provided distances: deadhead (base to pickup), loaded (pickup to dropoff), return (dropoff to base), and reload options (distance between dropoff and another load's pickup).\n\n"
-    "Return:\n"
-    "- A clear driver-by-driver breakdown:\n"
-    "    * List of assigned load IDs in order\n"
-    "    * Pickup and dropoff cities per load\n"
-    "    * Deadhead, loaded, return, and total km\n"
-    "    * Final loaded % per driver\n"
-    "- Any unassigned loads (if any)\n"
-    "- Suggestions to improve efficiency\n\n"
-    f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
-)
-
+            "You are Dispatchy — an elite logistics planner.\n\n"
+            "Your job is to assign all loads to the fewest drivers possible while minimizing empty kilometers.\n\n"
+            "Rules:\n"
+            "- All drivers start at the base and should end at or near the base.\n"
+            "- Loads may be done in any order.\n"
+            "- Chain loads together when possible to avoid unnecessary returns to base.\n"
+            "- Use the provided distances: deadhead (base to pickup), loaded (pickup to dropoff), return (dropoff to base), and reload options (distance between dropoff and another load's pickup).\n\n"
+            "Return:\n"
+            "- A clear driver-by-driver breakdown:\n"
+            "    * List of assigned load IDs in order\n"
+            "    * Pickup and dropoff cities per load\n"
+            "    * Deadhead, loaded, return, and total km\n"
+            "    * Final loaded % per driver\n"
+            "- Any unassigned loads (if any)\n"
+            "- Suggestions to improve efficiency\n\n"
+            f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
+        )
 
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
