@@ -5,7 +5,6 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-from utils import generate_google_map_html, generate_route_map_link  # 🆕 map helpers
 
 app = Flask(__name__)
 
@@ -29,24 +28,6 @@ def get_distance_key(origin, destination):
     sorted_pair = sorted([normalize_city(origin), normalize_city(destination)])
     return f"{sorted_pair[0]}|{sorted_pair[1]}"
 
-def get_coordinates(city):
-    city = normalize_city(city)
-    if city in COORD_CACHE:
-        return COORD_CACHE[city]
-
-    url = "https://maps.googleapis.com/maps/api/geocode/json"
-    params = {"address": city, "key": GOOGLE_KEY}
-    try:
-        res = requests.get(url, params=params)
-        data = res.json()
-        if data.get("results"):
-            location = data["results"][0]["geometry"]["location"]
-            latlng = (location["lat"], location["lng"])
-            COORD_CACHE[city] = latlng
-            return latlng
-    except:
-        pass
-    return None
 
 def get_distances_batch(origin, destinations):
     origin = normalize_city(origin)
@@ -118,7 +99,7 @@ def handle_dispatch():
             get_distances_batch(origin, list(dests))
 
         result = []
-        pins = [base]
+        pins = set()
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
@@ -140,40 +121,34 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
-            pins.extend([pickup, dropoff])
-
-        pin_coords = {city: get_coordinates(city) for city in pins}
-
         prompt = (
-    "You are Dispatchy — an elite AI logistics planner.\n\n"
-    "GOAL: Minimize total empty kilometers by chaining compatible loads.\n\n"
-    "🚚 RULES:\n"
-    "- Each driver starts at base and returns to base only after completing all their assigned loads.\n"
-    "- Use every load exactly once. Do not duplicate or insert loads.\n"
-    "- Chain loads in order where the dropoff of one is close to the pickup of the next.\n"
-    "- Use the provided `reload_options` to determine chaining feasibility.\n"
-    "- Never invent km — use only values provided for deadhead, loaded, and return.\n"
-    "- Avoid backtracking. Do not revisit cities already dropped off at unless explicitly required.\n"
-    "- Only calculate loaded km when a load is being hauled.\n\n"
-    "✏️ Return a clean dispatch plan:\n"
-    "- For each driver: list of load numbers with cities and distances\n"
-    "- Clearly mark deadhead, loaded, and return distances\n"
-    "- Final totals: total km, total loaded km, total empty km, and loaded %\n"
-    "- Highlight if a better chaining order is possible\n"
-    "- Identify any loads that couldn't be chained or assigned\n\n"
-    "📦 Provided load data:\n"
-    f"{json.dumps(result, indent=2)}"
-)
+            "You are Dispatchy — an elite AI logistics planner.\n\n"
+            "GOAL: Minimize total empty kilometers across all drivers.\n"
+            "Guidelines:\n"
+            "- Each driver starts and ends at base.\n"
+            "- You may reorder loads freely to optimize efficiency.\n"
+            "- Chain loads together when a dropoff is reasonably close to the next pickup.\n"
+            "- Use reload_options for potential chaining.\n"
+            "- Prefer chaining multiple loads per driver rather than assigning new drivers.\n"
+            "- Report accurate loaded and empty km.\n"
+            "- No arbitrary assumptions: use provided km for deadhead, loaded, and return.\n\n"
+            "Each load includes:\n"
+            "- pickup and dropoff\n"
+            "- deadhead km from base\n"
+            "- loaded km\n"
+            "- return km back to base\n"
+            "- reload options: list of other loads and distance to their pickup\n\n"
+            "Please return:\n"
+            "- Driver-by-driver breakdown: list of loads, loaded km, empty km, loaded %, total km\n"
+            "- Suggestions to improve load chaining\n"
+            "- Highlight unassigned loads, if any\n"
+            f"\nHere is the enriched load data:\n{json.dumps(result, indent=2)}"
+        )
 
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        map_html = generate_google_map_html(pin_coords, GOOGLE_KEY)
-        route_link = generate_route_map_link(pins)
-
-        return render_template_string(
-            f"<html><body><h2>Dispatch Plan</h2>{map_html}<p><a href='{route_link}' target='_blank'>🌐 Open Route in Google Maps</a></p><p style='font-family: monospace;'>{html_output}</p></body></html>"
-        )
+        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
