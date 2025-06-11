@@ -20,7 +20,7 @@ def get_agent_runner():
     "- Use as few drivers as possible\n"
     "- Ensure at least 70% loaded km per driver\n"
     "- Minimize empty kilometers and avoid unnecessary returns\n"
-    "- Chain loads when dropoff == next pickup\n"
+    "- Chain loads to reduce empty kms and return trips.\n"
     "Respond with only the optimized dispatch plan and supporting insights."
 )
     )

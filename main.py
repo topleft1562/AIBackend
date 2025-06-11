@@ -126,6 +126,7 @@ def handle_dispatch():
             "GOAL: Minimize total empty kilometers across all drivers.\n"
             "Guidelines:\n"
             "- Each driver starts and ends at base. Each load shows deadhead_km( from base for first load), and return_km ( back to base for final load ) \n"
+            "- Do not return to base, unless entire route is completed.\n"
             "- using the load data below, calculate the best PLAN with the least amount of drivers possible.\n"
             "- Chain as many loads together as possible using the reload options.\n"
             "Each load includes:\n"
