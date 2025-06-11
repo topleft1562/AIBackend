@@ -197,7 +197,6 @@ def handle_dispatch():
         return jsonify({"error": str(e)}), 500
     
 
-    
 @app.route("/direct_route_multi", methods=["POST"])
 def direct_route_multi():
     data = request.json
@@ -205,9 +204,38 @@ def direct_route_multi():
     if not routes:
         return jsonify({"error": "No routes provided."}), 400
 
+    # --- 1. COLLECT ALL REQUIRED CITY PAIRS ---
+    city_pairs = set()
+    for route in routes:
+        start = normalize_city(route.get("start", ""))
+        end = normalize_city(route.get("end", ""))
+        loads = route.get("loads", [])
+        if loads:
+            # Start -> first pickup
+            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
+            # Each load pickup -> dropoff
+            for load in loads:
+                pickup = normalize_city(load["pickupCity"])
+                dropoff = normalize_city(load["dropoffCity"])
+                city_pairs.add((pickup, dropoff))
+            # Between loads (dropoff -> next pickup)
+            for i in range(len(loads) - 1):
+                prev_drop = normalize_city(loads[i]["dropoffCity"])
+                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                city_pairs.add((prev_drop, next_pickup))
+            # Last dropoff -> end
+            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
+
+    # --- 2. FETCH ALL DISTANCES THAT AREN'T CACHED ---
+    origin_dest_map = defaultdict(set)
+    for origin, dest in city_pairs:
+        origin_dest_map[origin].add(dest)
+    for origin, dests in origin_dest_map.items():
+        get_distances_batch(origin, list(dests))
+
+    # --- 3. CALCULATE AND RENDER ALL ROUTES ---
     all_results = []
     for idx, route in enumerate(routes):
-        # Compute info for each route using helper (see below)
         info, table_html = compute_direct_route_info(route, idx + 1)
         all_results.append(table_html)
 
@@ -248,40 +276,39 @@ def direct_route_multi():
     return html
 
 def compute_direct_route_info(route, route_num=1):
-    # Get start/end/loads, apply normalization
     start = normalize_city(route.get("start", ""))
     end = normalize_city(route.get("end", ""))
     loads = route.get("loads", [])
 
-    # Prepare values
     loaded_km = 0.0
     empty_km = 0.0
     total_revenue = 0.0
-
     steps = []
-    # Step 1: Empty from start to first pickup
+
     if loads:
+        # Empty: Start -> first pickup
         first_pickup = normalize_city(loads[0]["pickupCity"])
         empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
         empty_km += empty_to_first
         steps.append(("Empty", f"{start} → {first_pickup}", empty_to_first, "-", "-", "-"))
-    # Steps 2: For each load in order
-    for i, load in enumerate(loads):
-        pickup = normalize_city(load["pickupCity"])
-        dropoff = normalize_city(load["dropoffCity"])
-        revenue = float(load.get("rate", 0)) * float(load.get("weight", 0))
-        dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
-        loaded_km += dist
-        total_revenue += revenue
-        steps.append(("Loaded", f"{pickup} → {dropoff}", dist, load.get("rate", 0), load.get("weight", 0), revenue))
-        # If not the last load, calculate empty between dropoff and next pickup
-        if i < len(loads) - 1:
-            next_pickup = normalize_city(loads[i + 1]["pickupCity"])
-            deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
-            empty_km += deadhead
-            steps.append(("Empty", f"{dropoff} → {next_pickup}", deadhead, "-", "-", "-"))
-    # Step 3: After last drop, empty to end location
-    if loads:
+        # Loaded and empty between loads
+        for i, load in enumerate(loads):
+            pickup = normalize_city(load["pickupCity"])
+            dropoff = normalize_city(load["dropoffCity"])
+            rate = float(load.get("rate", 0))
+            weight = float(load.get("weight", 0))
+            revenue = rate * weight
+            dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
+            loaded_km += dist
+            total_revenue += revenue
+            steps.append(("Loaded", f"{pickup} → {dropoff}", dist, rate, weight, revenue))
+            # Empty between this drop and next pickup (if not last)
+            if i < len(loads) - 1:
+                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
+                empty_km += deadhead
+                steps.append(("Empty", f"{dropoff} → {next_pickup}", deadhead, "-", "-", "-"))
+        # Empty: Last drop -> end
         last_drop = normalize_city(loads[-1]["dropoffCity"])
         empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
         empty_km += empty_back
@@ -292,7 +319,6 @@ def compute_direct_route_info(route, route_num=1):
     total_miles = total_km * 0.621371
     rpm = (total_revenue / total_miles) if total_miles else 0
 
-    # Build HTML table for this route
     table = f'<div class="route-title">Route {route_num}: {start} → {end}</div>'
     table += "<table><tr><th>Step</th><th>Segment</th><th>KMs</th><th>Rate</th><th>Weight</th><th>Revenue</th></tr>"
     for t in steps:
