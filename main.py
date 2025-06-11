@@ -128,7 +128,7 @@ def handle_dispatch():
 
         prompt = (
             "You are Dispatchy — an elite AI logistics planner.\n\n"
-            "The base location for these loads is {base}\n"
+            "The base location for these drivers is {base}\n"
             "GOALS:\n"
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
