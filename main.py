@@ -5,7 +5,7 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-from utils import generate_google_map_html  # 🆕 map helper
+from utils import generate_google_map_html, generate_route_map_link  # 🆕 map helpers
 
 app = Flask(__name__)
 
@@ -118,7 +118,7 @@ def handle_dispatch():
             get_distances_batch(origin, list(dests))
 
         result = []
-        pins = set()
+        pins = [base]
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
@@ -140,7 +140,7 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
 
-            pins.update({pickup, dropoff})
+            pins.extend([pickup, dropoff])
 
         pin_coords = {city: get_coordinates(city) for city in pins}
 
@@ -172,8 +172,11 @@ def handle_dispatch():
         html_output = response.response.replace("\n", "<br>")
 
         map_html = generate_google_map_html(pin_coords, GOOGLE_KEY)
+        route_link = generate_route_map_link(pins)
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{map_html}<p style='font-family: monospace;'>{html_output}</p></body></html>")
+        return render_template_string(
+            f"<html><body><h2>Dispatch Plan</h2>{map_html}<p><a href='{route_link}' target='_blank'>🌐 Open Route in Google Maps</a></p><p style='font-family: monospace;'>{html_output}</p></body></html>"
+        )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
