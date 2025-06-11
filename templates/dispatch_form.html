@@ -22,6 +22,16 @@
     /* Special width for X button */
     .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
     .load-row button { margin-left: 5px; min-width: 32px; }
+    /* Spinner style */
+    #spinner {
+      display: none;
+      margin: 30px auto;
+      text-align: center;
+    }
+    #spinner svg {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -53,6 +63,28 @@
     <button type="submit">Submit</button>
   </form>
 
+  <!-- Spinner markup -->
+  <div id="spinner">
+    <svg width="50" height="50" viewBox="0 0 50 50">
+      <circle
+        cx="25" cy="25" r="20"
+        stroke="#319795" stroke-width="5"
+        fill="none"
+        stroke-linecap="round"
+        stroke-dasharray="90"
+        stroke-dashoffset="60">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 25 25"
+          to="360 25 25"
+          dur="1s"
+          repeatCount="indefinite"/>
+      </circle>
+    </svg>
+    <div style="color:#319795;">Calculating optimal routes...</div>
+  </div>
+
   <div id="output" style="margin-top:30px;"></div>
 
   <script>
@@ -77,6 +109,9 @@
 
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
+      // Clear result and show spinner
+      document.getElementById("output").innerHTML = "";
+      document.getElementById("spinner").style.display = "block";
 
       const form = e.target;
       const base = form.base.value.trim();
@@ -98,14 +133,19 @@
         }
       }
 
-      const response = await fetch("/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base, loads })
-      });
-
-      const html = await response.text();
-      document.getElementById("output").innerHTML = html;
+      try {
+        const response = await fetch("/dispatch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base, loads })
+        });
+        const html = await response.text();
+        document.getElementById("output").innerHTML = html;
+      } catch (err) {
+        document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.</div>";
+      } finally {
+        document.getElementById("spinner").style.display = "none";
+      }
     });
   </script>
 </body>
