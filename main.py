@@ -121,6 +121,7 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
+            loaded_km = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
             reload_options = {
                 f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
@@ -134,7 +135,7 @@ def handle_dispatch():
                 "pickup": pickup,
                 "dropoff": dropoff,
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
-                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
+                "loaded_km": round(loaded_km, 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
                 "reload_options": reload_options,
             })
@@ -153,8 +154,8 @@ def handle_dispatch():
             "- Use as few drivers as possible.\n"
             "- You can reorder the loads.\n"
             "- You can chain loads by using reload_options.\n"
-            "- If a dropoff is reasonably close to another pickup (assess using actual route distance), treat it as a valid reload.\n"
-            "- Always calculate and report shortest actual distances between dropoff and next pickup for reload logic.\n"
+            "- If a dropoff is near another pickup (evaluate using reload_options distance), it's valid to chain.\n"
+            "- Never assume a load is 0 km unless pickup == dropoff.\n"
             "- Always report each driver's full empty km and full loaded km.\n"
             "- Do not ignore short or local chains (e.g., Belle Plaine ↔ Lajord).\n"
             "- Prefer total plans with lowest total empty km even if loaded % < 70%.\n\n"
