@@ -67,7 +67,7 @@ def handle_dispatch():
     
     if not loads:
         return jsonify({"error": "Missing loads in request."}), 400
-    print(f"base: {base_location}")
+
     try:
         base = normalize_city(base_location)
 
