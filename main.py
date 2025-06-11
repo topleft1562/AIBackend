@@ -6,6 +6,8 @@ from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
 
+from utils import calc_route_metrics
+
 app = Flask(__name__)
 
 # Initialize Dispatchy agent
@@ -194,6 +196,99 @@ def handle_dispatch():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/direct_route", methods=["POST"])
+def direct_route():
+    data = request.json
+    loads = data.get("loads", [])
+    start_location = data.get("start", "Brandon, MB")
+    end_location = data.get("end", "Brandon, MB")
+    
+    if not loads:
+        return jsonify({"error": "Missing loads in request."}), 400
+
+    try:
+        start = normalize_city(start_location)
+        end = normalize_city(end_location)
+        for i, load in enumerate(loads):
+            load["load_id"] = i + 1
+            load["pickupCity"] = normalize_city(load["pickupCity"])
+            load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            load["rate"] = float(load.get("rate", 0))
+            load["weight"] = float(load.get("weight", 0))
+            load["revenue"] = load["rate"] * load["weight"]
+
+        # Ensure all distances are calculated for this direct route
+        all_pairs = []
+        if loads:
+            all_pairs.append((start, loads[0]['pickupCity']))
+            for i in range(1, len(loads)):
+                all_pairs.append((loads[i-1]['dropoffCity'], loads[i]['pickupCity']))
+            all_pairs.append((loads[-1]['dropoffCity'], end))
+            for origin, dest in all_pairs:
+                get_distances_batch(origin, [dest])
+            # Fill in loaded_km for each load
+            for load in loads:
+                load["loaded_km"] = DISTANCE_CACHE.get(get_distance_key(load["pickupCity"], load["dropoffCity"]), 0)
+        
+        # Main calculation
+        metrics = calc_route_metrics(
+            loads,
+            start_location=start,
+            end_location=end,
+            get_distance=lambda a, b: DISTANCE_CACHE.get(get_distance_key(a, b), 0)
+        )
+
+        # Format as HTML
+        if not metrics:
+            html = "<b>No loads given.</b>"
+        else:
+            html = f"""
+            <html>
+            <head>
+            <style>
+                table {{
+                    border-collapse: collapse;
+                    margin: 16px 0;
+                    font-size: 15px;
+                    width: 100%;
+                    background: #fff;
+                }}
+                th, td {{
+                    border: 1px solid #bbb;
+                    padding: 6px 10px;
+                    text-align: center;
+                }}
+                th {{ background: #f4f4f4; }}
+            </style>
+            </head>
+            <body>
+            <h2>Direct Route Summary</h2>
+            <table>
+                <tr><th>Loaded km</th><td>{metrics['loaded_km']:.1f}</td></tr>
+                <tr><th>Empty km</th><td>{metrics['empty_km']:.1f}</td></tr>
+                <tr><th>Total km</th><td>{metrics['total_km']:.1f}</td></tr>
+                <tr><th>Loaded %</th><td>{metrics['loaded_pct']*100:.1f}%</td></tr>
+                <tr><th>Total Revenue ($)</th><td>{metrics['total_revenue']:.2f}</td></tr>
+                <tr><th>Total miles</th><td>{metrics['miles']:.1f}</td></tr>
+                <tr><th>RPM ($/mile)</th><td>{metrics['rpm']:.2f}</td></tr>
+            </table>
+            <h3>Loads (in order):</h3>
+            <table>
+                <tr>
+                    <th>#</th><th>Pickup</th><th>Dropoff</th><th>Loaded km</th><th>Revenue ($)</th>
+                </tr>
+                {''.join(f"<tr><td>{i+1}</td><td>{load['pickupCity']}</td><td>{load['dropoffCity']}</td><td>{load['loaded_km']:.1f}</td><td>{load['revenue']:.2f}</td></tr>" for i, load in enumerate(loads))}
+            </table>
+            </body>
+            </html>
+            """
+
+        return html
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/")
 def show_dispatch_form():

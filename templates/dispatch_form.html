@@ -41,6 +41,13 @@
     <label for="end">End Location:</label>
     <input type="text" id="end" name="end" placeholder="Ending Point" required />
 
+    <!-- Route type selector -->
+    <label for="routeMode">Route Type:</label>
+    <select id="routeMode" name="routeMode">
+      <option value="best">Best Route (AI Optimized)</option>
+      <option value="direct">Direct Route (Loads in Order)</option>
+    </select>
+
     <h3>Loads</h3>
     <div class="load-header">
       <span>Pickup</span>
@@ -117,6 +124,7 @@
       const form = e.target;
       const base = form.base.value.trim();
       const end = form.end.value.trim();
+      const routeMode = form.routeMode.value;
       const pickups = form.querySelectorAll("input[name='pickup']");
       const dropoffs = form.querySelectorAll("input[name='dropoff']");
       const counts = form.querySelectorAll("input[name='count']");
@@ -136,7 +144,9 @@
       }
 
       try {
-        const response = await fetch("/dispatch", {
+        // Choose endpoint
+        const endpoint = routeMode === "direct" ? "/direct_route" : "/dispatch";
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ start: base, end: end, loads })
