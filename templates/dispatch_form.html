@@ -11,7 +11,7 @@
     .load-row { margin-bottom: 10px; display: flex; align-items: center; }
     .load-row input { margin-right: 5px; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
-    .load-header span { min-width: 100px; margin-right: 5px; }
+    .load-header span { min-width: 110px; margin-right: 5px; }
   </style>
 </head>
 <body>
@@ -26,6 +26,7 @@
       <span>Dropoff</span>
       <span># of Loads</span>
       <span>Rate ($/MT)</span>
+      <span>Weight (MT)</span>
       <span style="width: 32px;"></span>
     </div>
     <div id="loadsContainer">
@@ -34,6 +35,7 @@
         <input type="text" name="dropoff" placeholder="Dropoff City" required />
         <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
         <input type="number" name="rate" placeholder="Rate" min="0" step="0.01" required />
+        <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
         <button type="button" onclick="removeLoadRow(this)">❌</button>
       </div>
     </div>
@@ -53,6 +55,7 @@
         <input type="text" name="dropoff" placeholder="Dropoff City" required />
         <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
         <input type="number" name="rate" placeholder="Rate" min="0" step="0.01" required />
+        <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
         <button type="button" onclick="removeLoadRow(this)">❌</button>
       `;
       container.appendChild(row);
@@ -71,6 +74,7 @@
       const dropoffs = form.querySelectorAll("input[name='dropoff']");
       const counts = form.querySelectorAll("input[name='count']");
       const rates = form.querySelectorAll("input[name='rate']");
+      const weights = form.querySelectorAll("input[name='weight']");
 
       const loads = [];
       for (let i = 0; i < pickups.length; i++) {
@@ -78,8 +82,9 @@
         const dropoff = dropoffs[i].value.trim();
         const count = parseInt(counts[i].value);
         const rate = parseFloat(rates[i].value);
+        const weight = parseFloat(weights[i].value);
         for (let j = 0; j < count; j++) {
-          loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate: rate });
+          loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight });
         }
       }
 

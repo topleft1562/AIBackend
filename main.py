@@ -82,9 +82,10 @@ def handle_dispatch():
             load["load_id"] = i + 1
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
-            # Pass rate through
+            # Accept and calculate revenue on backend
             load["rate"] = float(load.get("rate", 0))
-
+            load["weight"] = float(load.get("weight", 0))
+            load["revenue"] = load["rate"] * load["weight"]
 
         city_pairs = set()
         for load in loads:
@@ -118,7 +119,7 @@ def handle_dispatch():
                 "load_id": load["load_id"],
                 "pickup": pickup,
                 "dropoff": dropoff,
-                "rate": load["rate"],
+                "revenue": load["revenue"],
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(base, pickup), 0),
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, base), 0),
@@ -132,19 +133,18 @@ def handle_dispatch():
             "- Assign all loads using as few drivers as possible.\n"
             "- Maximize revenue per mile (RPM) per driver.\n\n"
             "Revenue Instructions:\n"
-            "- Each load has a `rate` (dollars/MT)."
-            "- For each load: revenue = rate x 43 x loaded_km"
-            "- For each driver: total revenue = sum of assigned loads' revenue."
-            "- Convert total kilometers to miles (1 km = 0.621371 miles)."
+            "- Each load has a `revenue` field (pre-calculated as rate x weight, in dollars).\n"
+            "- For each driver: total revenue = sum of assigned loads' revenue.\n"
+            "- Convert total kilometers to miles (1 km = 0.621371 miles).\n"
             "- For each driver: RPM = total revenue / (total km * 0.621371)\n\n"
             "Instructions:\n"
             "- Drivers must start at base and end at or near base.\n"
             "- Chain loads together when possible to avoid unnecessary returns to base (using reload_options).\n"
             "- Do not return to base unless the route is completed.\n"
-            "- For each driver: list assigned loads by load_id, with pickup, dropoff, loaded km, rate, revenue for each.\n"
+            "- For each driver: list assigned loads by load_id, with pickup, dropoff, loaded km, rate, weight, revenue for each.\n"
             "- Show totals per driver: loaded km, empty km, total km, loaded %, **total revenue**, and **RPM**.\n"
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
-            "- List unassigned loads (if any), with their rates and potential revenue.\n"
+            "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
             f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
