@@ -132,6 +132,7 @@ def handle_dispatch():
             "- Minimize total empty kilometers across all drivers.\n"
             "- Assign all loads using as few drivers as possible.\n"
             "- Maximize revenue per mile (RPM) per driver.\n\n"
+            "Format all tables in the response as HTML tables (use <table>, <tr>, <th>, <td>). Do NOT use Markdown or plain text tables.\n"
             "Revenue Instructions:\n"
             "- Each load has a `revenue` field (pre-calculated as rate x weight, in dollars).\n"
             "- For each driver: total revenue = sum of assigned loads' revenue.\n"
@@ -146,13 +147,41 @@ def handle_dispatch():
             "- Show a summary table for all drivers (total revenue, total loaded km, total empty km, average RPM).\n"
             "- List unassigned loads (if any), with their rates, weights, and potential revenue.\n"
             "- Suggest any improvements if possible.\n\n"
+            
             f"Here is the enriched load data:\n{json.dumps(result, indent=2)}"
         )
 
         response = agent.chat(prompt)
-        html_output = response.response.replace("\n", "<br>")
+        html_output = response.response
 
-        return render_template_string(f"<html><body><h2>Dispatch Plan</h2><p style='font-family: monospace;'>{html_output}</p></body></html>")
+        return render_template_string(f"""
+            <html>
+                <head>
+                    <style>
+                        table {{
+                            border-collapse: collapse;
+                            margin: 16px 0;
+                            font-size: 15px;
+                            width: 100%;
+                            background: #fff;
+                        }}
+                        th, td {{
+                            border: 1px solid #bbb;
+                            padding: 6px 10px;
+                            text-align: center;
+                        }}
+                        th {{
+                            background: #f4f4f4;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <h2>Dispatch Plan</h2>
+                    {html_output}
+                </body>
+            </html>
+        """)
+
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

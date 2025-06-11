@@ -9,9 +9,19 @@
     label { display: block; margin-top: 10px; }
     input, button, select { padding: 5px; margin-top: 5px; }
     .load-row { margin-bottom: 10px; display: flex; align-items: center; }
-    .load-row input { margin-right: 5px; }
+    .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
-    .load-header span { min-width: 110px; margin-right: 5px; }
+    .load-header span,
+    .load-row input { 
+      min-width: 130px;
+      max-width: 130px;
+      width: 130px;
+      margin-right: 0;
+      text-align: left;
+    }
+    /* Special width for X button */
+    .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
+    .load-row button { margin-left: 5px; min-width: 32px; }
   </style>
 </head>
 <body>
@@ -27,7 +37,7 @@
       <span># of Loads</span>
       <span>Rate ($/MT)</span>
       <span>Weight (MT)</span>
-      <span style="width: 32px;"></span>
+      <span></span>
     </div>
     <div id="loadsContainer">
       <div class="load-row">
