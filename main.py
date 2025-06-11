@@ -5,7 +5,6 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-from utils import calc_route_metrics
 
 
 app = Flask(__name__)
@@ -197,97 +196,126 @@ def handle_dispatch():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-@app.route("/direct_route", methods=["POST"])
-def direct_route():
-    data = request.json
-    loads = data.get("loads", [])
-    start_location = data.get("start", "Brandon, MB")
-    end_location = data.get("end", "Brandon, MB")
+
     
-    if not loads:
-        return jsonify({"error": "Missing loads in request."}), 400
+@app.route("/direct_route_multi", methods=["POST"])
+def direct_route_multi():
+    data = request.json
+    routes = data.get("routes", [])
+    if not routes:
+        return jsonify({"error": "No routes provided."}), 400
 
-    try:
-        start = normalize_city(start_location)
-        end = normalize_city(end_location)
-        for i, load in enumerate(loads):
-            load["load_id"] = i + 1
-            load["pickupCity"] = normalize_city(load["pickupCity"])
-            load["dropoffCity"] = normalize_city(load["dropoffCity"])
-            load["rate"] = float(load.get("rate", 0))
-            load["weight"] = float(load.get("weight", 0))
-            load["revenue"] = load["rate"] * load["weight"]
+    all_results = []
+    for idx, route in enumerate(routes):
+        # Compute info for each route using helper (see below)
+        info, table_html = compute_direct_route_info(route, idx + 1)
+        all_results.append(table_html)
 
-        # Ensure all distances are calculated for this direct route
-        all_pairs = []
-        if loads:
-            all_pairs.append((start, loads[0]['pickupCity']))
-            for i in range(1, len(loads)):
-                all_pairs.append((loads[i-1]['dropoffCity'], loads[i]['pickupCity']))
-            all_pairs.append((loads[-1]['dropoffCity'], end))
-            for origin, dest in all_pairs:
-                get_distances_batch(origin, [dest])
-            # Fill in loaded_km for each load
-            for load in loads:
-                load["loaded_km"] = DISTANCE_CACHE.get(get_distance_key(load["pickupCity"], load["dropoffCity"]), 0)
-        
-        # Main calculation
-        metrics = calc_route_metrics(
-            loads,
-            start_location=start,
-            end_location=end,
-            get_distance=lambda a, b: DISTANCE_CACHE.get(get_distance_key(a, b), 0)
-        )
+    html = """
+    <html>
+    <head>
+        <style>
+            table {
+                border-collapse: collapse;
+                margin: 20px 0;
+                font-size: 15px;
+                width: 100%;
+                background: #fff;
+            }
+            th, td {
+                border: 1px solid #bbb;
+                padding: 6px 10px;
+                text-align: center;
+            }
+            th {
+                background: #f4f4f4;
+            }
+            .route-title {
+                font-weight: bold;
+                font-size: 18px;
+                margin-top: 22px;
+                margin-bottom: 8px;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Direct Route Comparison</h2>
+        {}
+    </body>
+    </html>
+    """.format("".join(all_results))
 
-        # Format as HTML
-        if not metrics:
-            html = "<b>No loads given.</b>"
-        else:
-            html = f"""
-            <html>
-            <head>
-            <style>
-                table {{
-                    border-collapse: collapse;
-                    margin: 16px 0;
-                    font-size: 15px;
-                    width: 100%;
-                    background: #fff;
-                }}
-                th, td {{
-                    border: 1px solid #bbb;
-                    padding: 6px 10px;
-                    text-align: center;
-                }}
-                th {{ background: #f4f4f4; }}
-            </style>
-            </head>
-            <body>
-            <h2>Direct Route Summary</h2>
-            <table>
-                <tr><th>Loaded km</th><td>{metrics['loaded_km']:.1f}</td></tr>
-                <tr><th>Empty km</th><td>{metrics['empty_km']:.1f}</td></tr>
-                <tr><th>Total km</th><td>{metrics['total_km']:.1f}</td></tr>
-                <tr><th>Loaded %</th><td>{metrics['loaded_pct']*100:.1f}%</td></tr>
-                <tr><th>Total Revenue ($)</th><td>{metrics['total_revenue']:.2f}</td></tr>
-                <tr><th>Total miles</th><td>{metrics['miles']:.1f}</td></tr>
-                <tr><th>RPM ($/mile)</th><td>{metrics['rpm']:.2f}</td></tr>
-            </table>
-            <h3>Loads (in order):</h3>
-            <table>
-                <tr>
-                    <th>#</th><th>Pickup</th><th>Dropoff</th><th>Loaded km</th><th>Revenue ($)</th>
-                </tr>
-                {''.join(f"<tr><td>{i+1}</td><td>{load['pickupCity']}</td><td>{load['dropoffCity']}</td><td>{load['loaded_km']:.1f}</td><td>{load['revenue']:.2f}</td></tr>" for i, load in enumerate(loads))}
-            </table>
-            </body>
-            </html>
-            """
+    return html
 
-        return html
+def compute_direct_route_info(route, route_num=1):
+    # Get start/end/loads, apply normalization
+    start = normalize_city(route.get("start", ""))
+    end = normalize_city(route.get("end", ""))
+    loads = route.get("loads", [])
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # Prepare values
+    loaded_km = 0.0
+    empty_km = 0.0
+    total_revenue = 0.0
+
+    steps = []
+    # Step 1: Empty from start to first pickup
+    if loads:
+        first_pickup = normalize_city(loads[0]["pickupCity"])
+        empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
+        empty_km += empty_to_first
+        steps.append(("Empty", f"{start} → {first_pickup}", empty_to_first, "-", "-", "-"))
+    # Steps 2: For each load in order
+    for i, load in enumerate(loads):
+        pickup = normalize_city(load["pickupCity"])
+        dropoff = normalize_city(load["dropoffCity"])
+        revenue = float(load.get("rate", 0)) * float(load.get("weight", 0))
+        dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
+        loaded_km += dist
+        total_revenue += revenue
+        steps.append(("Loaded", f"{pickup} → {dropoff}", dist, load.get("rate", 0), load.get("weight", 0), revenue))
+        # If not the last load, calculate empty between dropoff and next pickup
+        if i < len(loads) - 1:
+            next_pickup = normalize_city(loads[i + 1]["pickupCity"])
+            deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
+            empty_km += deadhead
+            steps.append(("Empty", f"{dropoff} → {next_pickup}", deadhead, "-", "-", "-"))
+    # Step 3: After last drop, empty to end location
+    if loads:
+        last_drop = normalize_city(loads[-1]["dropoffCity"])
+        empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
+        empty_km += empty_back
+        steps.append(("Empty", f"{last_drop} → {end}", empty_back, "-", "-", "-"))
+
+    total_km = loaded_km + empty_km
+    loaded_pct = (loaded_km / total_km * 100) if total_km else 0
+    total_miles = total_km * 0.621371
+    rpm = (total_revenue / total_miles) if total_miles else 0
+
+    # Build HTML table for this route
+    table = f'<div class="route-title">Route {route_num}: {start} → {end}</div>'
+    table += "<table><tr><th>Step</th><th>Segment</th><th>KMs</th><th>Rate</th><th>Weight</th><th>Revenue</th></tr>"
+    for t in steps:
+        table += f"<tr>{''.join(f'<td>{x}</td>' for x in t)}</tr>"
+    table += "</table>"
+    table += f"""
+    <table>
+    <tr><th>Total Loaded KM</th><th>Total Empty KM</th><th>Total KM</th><th>Loaded %</th><th>Total Revenue ($)</th><th>RPM ($/mile)</th></tr>
+    <tr>
+      <td>{loaded_km:.1f}</td>
+      <td>{empty_km:.1f}</td>
+      <td>{total_km:.1f}</td>
+      <td>{loaded_pct:.1f}%</td>
+      <td>{total_revenue:,.2f}</td>
+      <td>{rpm:.2f}</td>
+    </tr>
+    </table>
+    """
+    return {
+        "loaded_km": loaded_km, "empty_km": empty_km, "total_km": total_km,
+        "loaded_pct": loaded_pct, "total_revenue": total_revenue, "rpm": rpm
+    }, table
+
 
 
 @app.route("/")

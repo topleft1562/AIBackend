@@ -8,6 +8,8 @@
     body { font-family: sans-serif; padding: 20px; }
     label { display: block; margin-top: 10px; }
     input, button, select { padding: 5px; margin-top: 5px; }
+    .route-block { border: 1px solid #aaa; padding: 16px; margin-bottom: 24px; background: #f9f9f9; border-radius: 7px; }
+    .route-block h3 { margin: 0 0 10px 0; }
     .load-row { margin-bottom: 10px; display: flex; align-items: center; }
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
@@ -35,43 +37,21 @@
 <body>
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
-    <label for="base">Start Location:</label>
-    <input type="text" id="base" name="base" placeholder="Starting Point" required />
-
-    <label for="end">End Location:</label>
-    <input type="text" id="end" name="end" placeholder="Ending Point" required />
 
     <!-- Route type selector -->
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
       <option value="best">Best Route (AI Optimized)</option>
-      <option value="direct">Direct Route (Loads in Order)</option>
+      <option value="direct">Direct Route (Loads in Order, Multi-Route)</option>
     </select>
 
-    <h3>Loads</h3>
-    <div class="load-header">
-      <span>Pickup</span>
-      <span>Dropoff</span>
-      <span># of Loads</span>
-      <span>Rate ($/MT)</span>
-      <span>Weight (MT)</span>
-      <span></span>
+    <div id="routesContainer">
+      <!-- Route blocks go here -->
     </div>
-    <div id="loadsContainer">
-      <div class="load-row">
-        <input type="text" name="pickup" placeholder="Pickup City" required />
-        <input type="text" name="dropoff" placeholder="Dropoff City" required />
-        <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
-        <input type="number" name="rate" placeholder="Rate" value="0" min="0" step="0.01" required />
-        <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
-        <button type="button" onclick="removeLoadRow(this)">❌</button>
-      </div>
-    </div>
-    <button type="button" onclick="addLoadRow()">➕ Add Load</button><br><br>
+    <button type="button" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
   </form>
 
-  <!-- Spinner markup -->
   <div id="spinner">
     <svg width="50" height="50" viewBox="0 0 50 50">
       <circle
@@ -92,13 +72,55 @@
     </svg>
     <div style="color:#319795;">Calculating optimal routes...</div>
   </div>
-
   <div id="output" style="margin-top:30px;"></div>
 
   <script>
-    function addLoadRow() {
-      const container = document.getElementById("loadsContainer");
-      const row = document.createElement("div");
+    let routeCount = 0;
+    function addRouteBlock() {
+      routeCount += 1;
+      const routesContainer = document.getElementById('routesContainer');
+      const routeDiv = document.createElement('div');
+      routeDiv.className = "route-block";
+      routeDiv.dataset.routeIndex = routeCount;
+
+      routeDiv.innerHTML = `
+        <h3>Route ${routeCount} <button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button></h3>
+        <label>Start Location:</label>
+        <input type="text" name="start" placeholder="Starting Point" required />
+
+        <label>End Location:</label>
+        <input type="text" name="end" placeholder="Ending Point" required />
+
+        <div class="load-header">
+          <span>Pickup</span>
+          <span>Dropoff</span>
+          <span># of Loads</span>
+          <span>Rate ($/MT)</span>
+          <span>Weight (MT)</span>
+          <span></span>
+        </div>
+        <div class="loadsContainer">
+          <div class="load-row">
+            <input type="text" name="pickup" placeholder="Pickup City" required />
+            <input type="text" name="dropoff" placeholder="Dropoff City" required />
+            <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
+            <input type="number" name="rate" placeholder="Rate" value="0" min="0" step="0.01" required />
+            <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
+            <button type="button" onclick="removeLoadRow(this)">❌</button>
+          </div>
+        </div>
+        <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
+      `;
+      routesContainer.appendChild(routeDiv);
+    }
+
+    function removeRouteBlock(btn) {
+      btn.closest('.route-block').remove();
+    }
+
+    function addLoadRow(routeBtn) {
+      const loadsContainer = routeBtn.closest('.route-block').querySelector('.loadsContainer');
+      const row = document.createElement('div');
       row.className = "load-row";
       row.innerHTML = `
         <input type="text" name="pickup" placeholder="Pickup City" required />
@@ -108,48 +130,64 @@
         <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
         <button type="button" onclick="removeLoadRow(this)">❌</button>
       `;
-      container.appendChild(row);
+      loadsContainer.appendChild(row);
     }
 
     function removeLoadRow(btn) {
       btn.parentElement.remove();
     }
 
+    // Add one route on page load
+    window.onload = function() { addRouteBlock(); };
+
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
-      // Clear result and show spinner
       document.getElementById("output").innerHTML = "";
       document.getElementById("spinner").style.display = "block";
 
-      const form = e.target;
-      const base = form.base.value.trim();
-      const end = form.end.value.trim();
-      const routeMode = form.routeMode.value;
-      const pickups = form.querySelectorAll("input[name='pickup']");
-      const dropoffs = form.querySelectorAll("input[name='dropoff']");
-      const counts = form.querySelectorAll("input[name='count']");
-      const rates = form.querySelectorAll("input[name='rate']");
-      const weights = form.querySelectorAll("input[name='weight']");
+      const routeMode = document.getElementById("routeMode").value;
+      // Collect all route blocks
+      const routeBlocks = document.querySelectorAll('.route-block');
+      let dataToSend = [];
 
-      const loads = [];
-      for (let i = 0; i < pickups.length; i++) {
-        const pickup = pickups[i].value.trim();
-        const dropoff = dropoffs[i].value.trim();
-        const count = parseInt(counts[i].value);
-        const rate = parseFloat(rates[i].value);
-        const weight = parseFloat(weights[i].value);
-        for (let j = 0; j < count; j++) {
-          loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight });
+      for (const routeDiv of routeBlocks) {
+        const start = routeDiv.querySelector("input[name='start']").value.trim();
+        const end = routeDiv.querySelector("input[name='end']").value.trim();
+        const pickups = routeDiv.querySelectorAll("input[name='pickup']");
+        const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
+        const counts = routeDiv.querySelectorAll("input[name='count']");
+        const rates = routeDiv.querySelectorAll("input[name='rate']");
+        const weights = routeDiv.querySelectorAll("input[name='weight']");
+
+        const loads = [];
+        for (let i = 0; i < pickups.length; i++) {
+          const pickup = pickups[i].value.trim();
+          const dropoff = dropoffs[i].value.trim();
+          const count = parseInt(counts[i].value);
+          const rate = parseFloat(rates[i].value);
+          const weight = parseFloat(weights[i].value);
+          for (let j = 0; j < count; j++) {
+            loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight });
+          }
         }
+        dataToSend.push({ start, end, loads });
       }
 
       try {
-        // Choose endpoint
-        const endpoint = routeMode === "direct" ? "/direct_route" : "/dispatch";
+        let endpoint;
+        let payload;
+        if (routeMode === "direct") {
+          endpoint = "/direct_route_multi"; // <-- You will need this backend endpoint!
+          payload = { routes: dataToSend };
+        } else {
+          // Only send the first route if AI mode (for simplicity)
+          endpoint = "/dispatch";
+          payload = { ...dataToSend[0] };
+        }
         const response = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ start: base, end: end, loads })
+          body: JSON.stringify(payload)
         });
         const html = await response.text();
         document.getElementById("output").innerHTML = html;
