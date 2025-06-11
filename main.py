@@ -5,6 +5,7 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
+from utils import generate_google_map_html  # 🆕 map helper
 
 app = Flask(__name__)
 
@@ -170,25 +171,7 @@ def handle_dispatch():
         response = agent.chat(prompt)
         html_output = response.response.replace("\n", "<br>")
 
-        pin_markers = [
-            f"new google.maps.Marker({{ position: {{ lat: {lat}, lng: {lng} }}, map: map, title: '{city}' }});"
-            for city, (lat, lng) in pin_coords.items() if lat and lng
-        ]
-
-        map_html = f"""
-        <div id='map' style='height: 600px; width: 100%;'></div>
-        <script src='https://maps.googleapis.com/maps/api/js?key={GOOGLE_KEY}'></script>
-        <script>
-        function initMap() {{
-            const map = new google.maps.Map(document.getElementById('map'), {{
-                zoom: 5,
-                center: {{ lat: 50.0, lng: -100.0 }}
-            }});
-            {''.join(pin_markers)}
-        }}
-        window.onload = initMap;
-        </script>
-        """
+        map_html = generate_google_map_html(pin_coords, GOOGLE_KEY)
 
         return render_template_string(f"<html><body><h2>Dispatch Plan</h2>{map_html}<p style='font-family: monospace;'>{html_output}</p></body></html>")
 
