@@ -139,7 +139,8 @@ def handle_dispatch():
     "- Each load includes a `revenue` field (rate × weight, in dollars).\n"
     "- For each driver:\n"
     "    - Start at start_location; add deadhead_km to first pickup as empty.\n"
-    "    - Chain additional loads ONLY if reload_km (deadhead_from_this_dropoff) is low; add each as empty km between loads.\n"
+    "    - For each subsequent chained load, always use the exact reload_option's deadhead_from_this_dropoff for that step as empty km (distance from previous dropoff to next pickup).\n"
+    "    - Only use reload_km=0 if the previous dropoff and next pickup are truly the exact same location; otherwise, always use the provided reload_km."
     "    - After final dropoff, add return_km to end_location as empty km.\n"
     "    - Total empty km = first deadhead_km + all reload_kms (between loads) + final return_km.\n"
     "    - Total loaded km = sum of loaded_km for all assigned loads.\n"
@@ -158,8 +159,6 @@ def handle_dispatch():
     "- Suggest improvements or ways to group unassigned loads if possible.\n\n"
     f"\nHere is the enriched dispatch data (start_location, end_location and all loads):\n{json.dumps(enriched_data, indent=2)}"
 )
-
-
 
         response = agent.chat(prompt)
         html_output = response.response
