@@ -5,8 +5,8 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-
 from utils import calc_route_metrics
+
 
 app = Flask(__name__)
 
