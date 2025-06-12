@@ -36,6 +36,11 @@
       display: none;
       margin-bottom: 10px;
     }
+    .remove-route-btn {
+      float: right;
+      color: #e53e3e;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -79,6 +84,7 @@
 
   <script>
     let routeCount = 0;
+
     function addRouteBlock() {
       routeCount += 1;
       const routesContainer = document.getElementById('routesContainer');
@@ -86,13 +92,8 @@
       routeDiv.className = "route-block";
       routeDiv.dataset.routeIndex = routeCount;
 
-      // Add remove button only if in direct mode and more than one route
-      const routeMode = document.getElementById('routeMode').value;
-      const removeBtn = (routeMode === "direct" && routeCount > 1) ?
-        `<button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button>` : "";
-
       routeDiv.innerHTML = `
-        <h3>Route ${routeCount} ${removeBtn}</h3>
+        <h3>Route ${routeCount} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button></h3>
         <label>Start Location:</label>
         <input type="text" name="start" placeholder="Starting Point" required />
 
@@ -120,15 +121,16 @@
         <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
       `;
       routesContainer.appendChild(routeDiv);
+      updateRouteUI();
     }
 
     function removeRouteBlock(btn) {
       btn.closest('.route-block').remove();
-      // Always leave at least one route
       if (document.querySelectorAll('.route-block').length === 0) {
         addRouteBlock();
       }
       updateRouteNumbers();
+      updateRouteUI();
     }
 
     function addLoadRow(routeBtn) {
@@ -154,34 +156,42 @@
       const blocks = document.querySelectorAll('.route-block');
       blocks.forEach((block, i) => {
         const h3 = block.querySelector('h3');
-        h3.innerHTML = `Route ${i + 1} <button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button>`;
+        h3.innerHTML = `Route ${i + 1} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>`;
         block.dataset.routeIndex = i + 1;
       });
       routeCount = blocks.length;
     }
 
-    // Add one route on page load
-    window.onload = function() { addRouteBlock(); };
-
-    // Handle Route Type switch
-    document.getElementById("routeMode").addEventListener("change", function (e) {
-      const routeMode = e.target.value;
+    // Update Add/Remove Route button visibility based on mode and route count
+    function updateRouteUI() {
+      const routeMode = document.getElementById("routeMode").value;
       const addRouteBtn = document.getElementById("addRouteBtn");
-      // Remove all but the first route block
-      const routesContainer = document.getElementById("routesContainer");
-      while (routesContainer.children.length > 1) {
-        routesContainer.removeChild(routesContainer.lastChild);
-      }
-      // Reset the first route number
-      routeCount = 1;
-      if (routesContainer.children.length === 1) {
-        routesContainer.children[0].querySelector('h3').innerHTML = 'Route 1';
+      const removeBtns = document.querySelectorAll('.remove-route-btn');
+      if (routeMode === "direct") {
+        addRouteBtn.style.display = "";
+        // Show remove buttons only if >1 route
+        removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "" : "none"));
       } else {
-        addRouteBlock();
+        addRouteBtn.style.display = "none";
+        removeBtns.forEach(btn => btn.style.display = "none");
+        // Ensure only one route block in best mode
+        const routesContainer = document.getElementById("routesContainer");
+        while (routesContainer.children.length > 1) {
+          routesContainer.removeChild(routesContainer.lastChild);
+        }
+        routeCount = 1;
+        updateRouteNumbers();
       }
-      // Show/hide the Add Route button
-      addRouteBtn.style.display = routeMode === "direct" ? "" : "none";
-    });
+    }
+
+    // Initial load
+    window.onload = function() {
+      addRouteBlock();
+      updateRouteUI();
+      document.getElementById('routeMode').addEventListener('change', function() {
+        updateRouteUI();
+      });
+    };
 
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
@@ -189,7 +199,6 @@
       document.getElementById("spinner").style.display = "block";
 
       const routeMode = document.getElementById("routeMode").value;
-      // Collect all route blocks
       const routeBlocks = document.querySelectorAll('.route-block');
       let dataToSend = [];
 
@@ -217,13 +226,11 @@
       }
 
       try {
-        let endpoint;
-        let payload;
+        let endpoint, payload;
         if (routeMode === "direct") {
           endpoint = "/direct_route_multi";
           payload = { routes: dataToSend };
         } else {
-          // Only send the first route if AI mode (for simplicity)
           endpoint = "/dispatch";
           payload = { ...dataToSend[0] };
         }
@@ -241,11 +248,11 @@
       }
     });
 
-    // Show "Add Route" only if direct mode on load (refresh case)
+    // Ensure UI is consistent if reloaded (browser refresh)
     window.addEventListener('DOMContentLoaded', function() {
-      document.getElementById("addRouteBtn").style.display =
-        document.getElementById("routeMode").value === "direct" ? "" : "none";
+      updateRouteUI();
     });
+
   </script>
 </body>
 </html>
