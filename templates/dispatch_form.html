@@ -84,6 +84,7 @@
 
   <script>
     let routeCount = 0;
+    let currentRouteMode = "best"; // Track current mode
 
     function addRouteBlock() {
       routeCount += 1;
@@ -162,19 +163,22 @@
       routeCount = blocks.length;
     }
 
-    // Update Add/Remove Route button visibility based on mode and route count
+    // Centralized function to handle mode change
+    function setRouteMode(mode) {
+      currentRouteMode = mode;
+      updateRouteUI();
+    }
+
     function updateRouteUI() {
-      const routeMode = document.getElementById("routeMode").value;
       const addRouteBtn = document.getElementById("addRouteBtn");
       const removeBtns = document.querySelectorAll('.remove-route-btn');
-      if (routeMode === "direct") {
+      if (currentRouteMode === "direct") {
         addRouteBtn.style.display = "";
-        // Show remove buttons only if >1 route
         removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "" : "none"));
       } else {
         addRouteBtn.style.display = "none";
         removeBtns.forEach(btn => btn.style.display = "none");
-        // Ensure only one route block in best mode
+        // Only keep one route block
         const routesContainer = document.getElementById("routesContainer");
         while (routesContainer.children.length > 1) {
           routesContainer.removeChild(routesContainer.lastChild);
@@ -189,7 +193,7 @@
       addRouteBlock();
       updateRouteUI();
       document.getElementById('routeMode').addEventListener('change', function() {
-        updateRouteUI();
+        setRouteMode(this.value);
       });
     };
 
@@ -198,7 +202,6 @@
       document.getElementById("output").innerHTML = "";
       document.getElementById("spinner").style.display = "block";
 
-      const routeMode = document.getElementById("routeMode").value;
       const routeBlocks = document.querySelectorAll('.route-block');
       let dataToSend = [];
 
@@ -227,7 +230,7 @@
 
       try {
         let endpoint, payload;
-        if (routeMode === "direct") {
+        if (currentRouteMode === "direct") {
           endpoint = "/direct_route_multi";
           payload = { routes: dataToSend };
         } else {
