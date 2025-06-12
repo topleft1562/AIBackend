@@ -32,13 +32,15 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
+    #addRouteBtn {
+      display: none;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
-
-    <!-- Route type selector -->
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
       <option value="best">Best Route (AI Optimized)</option>
@@ -48,7 +50,8 @@
     <div id="routesContainer">
       <!-- Route blocks go here -->
     </div>
-    <button type="button" onclick="addRouteBlock()">➕ Add Route</button><br><br>
+    <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button>
+    <br><br>
     <button type="submit">Submit</button>
   </form>
 
@@ -83,8 +86,13 @@
       routeDiv.className = "route-block";
       routeDiv.dataset.routeIndex = routeCount;
 
+      // Add remove button only if in direct mode and more than one route
+      const routeMode = document.getElementById('routeMode').value;
+      const removeBtn = (routeMode === "direct" && routeCount > 1) ?
+        `<button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button>` : "";
+
       routeDiv.innerHTML = `
-        <h3>Route ${routeCount} <button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button></h3>
+        <h3>Route ${routeCount} ${removeBtn}</h3>
         <label>Start Location:</label>
         <input type="text" name="start" placeholder="Starting Point" required />
 
@@ -116,6 +124,11 @@
 
     function removeRouteBlock(btn) {
       btn.closest('.route-block').remove();
+      // Always leave at least one route
+      if (document.querySelectorAll('.route-block').length === 0) {
+        addRouteBlock();
+      }
+      updateRouteNumbers();
     }
 
     function addLoadRow(routeBtn) {
@@ -137,8 +150,38 @@
       btn.parentElement.remove();
     }
 
+    function updateRouteNumbers() {
+      const blocks = document.querySelectorAll('.route-block');
+      blocks.forEach((block, i) => {
+        const h3 = block.querySelector('h3');
+        h3.innerHTML = `Route ${i + 1} <button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button>`;
+        block.dataset.routeIndex = i + 1;
+      });
+      routeCount = blocks.length;
+    }
+
     // Add one route on page load
     window.onload = function() { addRouteBlock(); };
+
+    // Handle Route Type switch
+    document.getElementById("routeMode").addEventListener("change", function (e) {
+      const routeMode = e.target.value;
+      const addRouteBtn = document.getElementById("addRouteBtn");
+      // Remove all but the first route block
+      const routesContainer = document.getElementById("routesContainer");
+      while (routesContainer.children.length > 1) {
+        routesContainer.removeChild(routesContainer.lastChild);
+      }
+      // Reset the first route number
+      routeCount = 1;
+      if (routesContainer.children.length === 1) {
+        routesContainer.children[0].querySelector('h3').innerHTML = 'Route 1';
+      } else {
+        addRouteBlock();
+      }
+      // Show/hide the Add Route button
+      addRouteBtn.style.display = routeMode === "direct" ? "" : "none";
+    });
 
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
@@ -177,7 +220,7 @@
         let endpoint;
         let payload;
         if (routeMode === "direct") {
-          endpoint = "/direct_route_multi"; // <-- You will need this backend endpoint!
+          endpoint = "/direct_route_multi";
           payload = { routes: dataToSend };
         } else {
           // Only send the first route if AI mode (for simplicity)
@@ -196,6 +239,12 @@
       } finally {
         document.getElementById("spinner").style.display = "none";
       }
+    });
+
+    // Show "Add Route" only if direct mode on load (refresh case)
+    window.addEventListener('DOMContentLoaded', function() {
+      document.getElementById("addRouteBtn").style.display =
+        document.getElementById("routeMode").value === "direct" ? "" : "none";
     });
   </script>
 </body>
