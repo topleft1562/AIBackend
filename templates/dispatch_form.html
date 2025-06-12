@@ -32,23 +32,24 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { 100% { transform: rotate(360deg); } }
+    #addRouteBtn { display: none; margin-bottom: 10px; }
+    .remove-route-btn { float: right; color: #e53e3e; display: none; }
   </style>
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
-
     <!-- Route type selector -->
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
       <option value="best">Best Route (AI Optimized)</option>
-      <option value="direct">Direct Route (Loads in Order, Multi-Route)</option>
+      <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
 
     <div id="routesContainer">
       <!-- Route blocks go here -->
     </div>
-    <button type="button" onclick="addRouteBlock()">➕ Add Route</button><br><br>
+    <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
   </form>
 
@@ -76,6 +77,8 @@
 
   <script>
     let routeCount = 0;
+    let currentRouteMode = "direct"; // Default to direct
+
     function addRouteBlock() {
       routeCount += 1;
       const routesContainer = document.getElementById('routesContainer');
@@ -84,7 +87,7 @@
       routeDiv.dataset.routeIndex = routeCount;
 
       routeDiv.innerHTML = `
-        <h3>Route ${routeCount} <button type="button" onclick="removeRouteBlock(this)" style="float:right;color:#e53e3e;">Remove Route</button></h3>
+        <h3>Route ${routeCount} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button></h3>
         <label>Start Location:</label>
         <input type="text" name="start" placeholder="Starting Point" required />
 
@@ -112,10 +115,14 @@
         <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
       `;
       routesContainer.appendChild(routeDiv);
+      updateRouteUI();
     }
 
     function removeRouteBlock(btn) {
       btn.closest('.route-block').remove();
+      // Update numbering and UI after removal
+      updateRouteNumbers();
+      updateRouteUI();
     }
 
     function addLoadRow(routeBtn) {
@@ -137,15 +144,53 @@
       btn.parentElement.remove();
     }
 
-    // Add one route on page load
-    window.onload = function() { addRouteBlock(); };
+    function updateRouteNumbers() {
+      const blocks = document.querySelectorAll('.route-block');
+      blocks.forEach((block, i) => {
+        const h3 = block.querySelector('h3');
+        h3.innerHTML = `Route ${i + 1} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>`;
+        block.dataset.routeIndex = i + 1;
+      });
+      routeCount = blocks.length;
+    }
+
+    // Handle mode switch UI logic
+    function updateRouteUI() {
+      const addRouteBtn = document.getElementById("addRouteBtn");
+      const removeBtns = document.querySelectorAll('.remove-route-btn');
+      const routesContainer = document.getElementById("routesContainer");
+      if (currentRouteMode === "direct") {
+        addRouteBtn.style.display = "";
+        // Show remove only if >1 route
+        removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "" : "none"));
+      } else {
+        addRouteBtn.style.display = "none";
+        removeBtns.forEach(btn => btn.style.display = "none");
+        // Only keep one route
+        while (routesContainer.children.length > 1) {
+          routesContainer.removeChild(routesContainer.lastChild);
+        }
+        routeCount = 1;
+        updateRouteNumbers();
+      }
+    }
+
+    // Set up everything on page load
+    window.onload = function() {
+      addRouteBlock(); // Always start with one
+      document.getElementById("routeMode").value = "direct";
+      updateRouteUI();
+      document.getElementById('routeMode').addEventListener('change', function() {
+        currentRouteMode = this.value;
+        updateRouteUI();
+      });
+    };
 
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       document.getElementById("output").innerHTML = "";
       document.getElementById("spinner").style.display = "block";
 
-      const routeMode = document.getElementById("routeMode").value;
       // Collect all route blocks
       const routeBlocks = document.querySelectorAll('.route-block');
       let dataToSend = [];
@@ -176,11 +221,10 @@
       try {
         let endpoint;
         let payload;
-        if (routeMode === "direct") {
+        if (currentRouteMode === "direct") {
           endpoint = "/direct_route_multi"; // <-- You will need this backend endpoint!
           payload = { routes: dataToSend };
         } else {
-          // Only send the first route if AI mode (for simplicity)
           endpoint = "/dispatch";
           payload = { ...dataToSend[0] };
         }
