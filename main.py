@@ -286,13 +286,14 @@ def compute_direct_route_info(route, route_num=1):
     empty_km = 0.0
     total_revenue = 0.0
     steps = []
+    num_loaded_legs = 0
 
     if loads:
         # Empty: Start -> first pickup
         first_pickup = normalize_city(loads[0]["pickupCity"])
         empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
         empty_km += empty_to_first
-        steps.append(("Empty", f"{start} → {first_pickup}", empty_to_first, "-", "-", "-"))
+        steps.append(("Empty", f"{start} → {first_pickup}", empty_to_first, "-", "-", "-", "0.00"))
         # Loaded and empty between loads
         for i, load in enumerate(loads):
             pickup = normalize_city(load["pickupCity"])
@@ -303,32 +304,50 @@ def compute_direct_route_info(route, route_num=1):
             dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
             loaded_km += dist
             total_revenue += revenue
-            steps.append(("Loaded", f"{pickup} → {dropoff}", dist, rate, weight, revenue))
+            num_loaded_legs += 1
+            # RPM for this loaded segment
+            miles = dist * 0.621371
+            rpm = (revenue / miles) if miles else 0
+            steps.append(("Loaded", f"{pickup} → {dropoff}", dist, rate, weight, revenue, f"{rpm:.2f}"))
             # Empty between this drop and next pickup (if not last)
             if i < len(loads) - 1:
                 next_pickup = normalize_city(loads[i+1]["pickupCity"])
                 deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
                 empty_km += deadhead
-                steps.append(("Empty", f"{dropoff} → {next_pickup}", deadhead, "-", "-", "-"))
+                steps.append(("Empty", f"{dropoff} → {next_pickup}", deadhead, "-", "-", "-", "0.00"))
         # Empty: Last drop -> end
         last_drop = normalize_city(loads[-1]["dropoffCity"])
         empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
         empty_km += empty_back
-        steps.append(("Empty", f"{last_drop} → {end}", empty_back, "-", "-", "-"))
+        steps.append(("Empty", f"{last_drop} → {end}", empty_back, "-", "-", "-", "0.00"))
 
     total_km = loaded_km + empty_km
     loaded_pct = (loaded_km / total_km * 100) if total_km else 0
     total_miles = total_km * 0.621371
     rpm = (total_revenue / total_miles) if total_miles else 0
 
+    # Calculate hourly rate
+    # Hours = driving + 1hr load + 1hr unload per loaded leg
+    driving_hours = total_km / 85 if total_km else 0
+    total_hours = driving_hours + 2 * num_loaded_legs
+    hourly_rate = (total_revenue / total_hours) if total_hours else 0
+
     table = f'<div class="route-title">Route {route_num}: {start} → {end}</div>'
-    table += "<table><tr><th>Step</th><th>Segment</th><th>KMs</th><th>Rate</th><th>Weight</th><th>Revenue</th></tr>"
+    table += "<table><tr><th>Step</th><th>Segment</th><th>KMs</th><th>Rate</th><th>Weight</th><th>Revenue</th><th>RPM ($/mile)</th></tr>"
     for t in steps:
         table += f"<tr>{''.join(f'<td>{x}</td>' for x in t)}</tr>"
     table += "</table>"
     table += f"""
     <table>
-    <tr><th>Total Loaded KM</th><th>Total Empty KM</th><th>Total KM</th><th>Loaded %</th><th>Total Revenue ($)</th><th>RPM ($/mile)</th></tr>
+    <tr>
+      <th>Total Loaded KM</th>
+      <th>Total Empty KM</th>
+      <th>Total KM</th>
+      <th>Loaded %</th>
+      <th>Total Revenue ($)</th>
+      <th>RPM ($/mile)</th>
+      <th>Hourly Rate ($/hour)</th>
+    </tr>
     <tr>
       <td>{loaded_km:.1f}</td>
       <td>{empty_km:.1f}</td>
@@ -336,14 +355,15 @@ def compute_direct_route_info(route, route_num=1):
       <td>{loaded_pct:.1f}%</td>
       <td>{total_revenue:,.2f}</td>
       <td>{rpm:.2f}</td>
+      <td>{hourly_rate:.2f}</td>
     </tr>
     </table>
     """
     return {
         "loaded_km": loaded_km, "empty_km": empty_km, "total_km": total_km,
-        "loaded_pct": loaded_pct, "total_revenue": total_revenue, "rpm": rpm
+        "loaded_pct": loaded_pct, "total_revenue": total_revenue, "rpm": rpm,
+        "hourly_rate": hourly_rate
     }, table
-
 
 
 @app.route("/")
