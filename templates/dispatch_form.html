@@ -158,6 +158,21 @@
     function updateRouteUI() {
       const addRouteBtn = document.getElementById("addRouteBtn");
       const routesContainer = document.getElementById("routesContainer");
+      const blocks = document.querySelectorAll('.route-block');
+
+      // Toggle required attribute on Start/End inputs per mode
+      blocks.forEach(block => {
+        const startInput = block.querySelector("input[name='start']");
+        const endInput = block.querySelector("input[name='end']");
+        if (currentRouteMode === "direct") {
+          startInput.removeAttribute("required");
+          endInput.removeAttribute("required");
+        } else {
+          startInput.setAttribute("required", "required");
+          endInput.setAttribute("required", "required");
+        }
+      });
+
       if (currentRouteMode === "direct") {
         addRouteBtn.style.display = "inline-block";
         const removeBtns = document.querySelectorAll('.remove-route-btn');
@@ -197,14 +212,17 @@
       let dataToSend = [];
 
       for (const routeDiv of routeBlocks) {
-        const start = routeDiv.querySelector("input[name='start']").value.trim();
-        const end = routeDiv.querySelector("input[name='end']").value.trim();
         const pickups = routeDiv.querySelectorAll("input[name='pickup']");
         const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
+
+        // Get raw values first
+        let start = routeDiv.querySelector("input[name='start']").value.trim();
+        let end = routeDiv.querySelector("input[name='end']").value.trim();
+
+        // Gather all loads as before
         const counts = routeDiv.querySelectorAll("input[name='count']");
         const rates = routeDiv.querySelectorAll("input[name='rate']");
         const weights = routeDiv.querySelectorAll("input[name='weight']");
-
         const loads = [];
         for (let i = 0; i < pickups.length; i++) {
           const pickup = pickups[i].value.trim();
@@ -216,6 +234,17 @@
             loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight });
           }
         }
+
+        // Only for direct route mode: fill start/end if blank
+        if (currentRouteMode === "direct") {
+          if (!start && loads.length) {
+            start = loads[0].pickupCity || "";  // First pickup
+          }
+          if (!end && loads.length) {
+            end = loads[loads.length - 1].dropoffCity || ""; // Last dropoff
+          }
+        }
+
         dataToSend.push({ start, end, loads });
       }
 
