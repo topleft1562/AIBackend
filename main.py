@@ -147,6 +147,7 @@ def handle_dispatch():
     "    - Total loaded km = sum of loaded_km for all assigned loads.\n"
     "    - Total km = loaded km + empty km.\n"
     "    - Loaded % = loaded km / total km.\n"
+    "    - calculate hours required/ days to complete based on 80km/h and 1 hour load and unload times and Max 14 hour days."
     "- Each load can only be assigned once.\n"
     "- For each driver: total revenue = sum of their assigned loads' revenue.\n"
     "- Convert total km to miles (1 km = 0.621371 miles).\n"
