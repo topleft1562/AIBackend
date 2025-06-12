@@ -157,23 +157,24 @@
     // Handle mode switch UI logic
     function updateRouteUI() {
       const addRouteBtn = document.getElementById("addRouteBtn");
-      const removeBtns = document.querySelectorAll('.remove-route-btn');
       const routesContainer = document.getElementById("routesContainer");
       if (currentRouteMode === "direct") {
-        addRouteBtn.style.display = "";
-        // Show remove only if >1 route
-        removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "" : "none"));
+        addRouteBtn.style.display = "inline-block";
+        const removeBtns = document.querySelectorAll('.remove-route-btn');
+        removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "inline" : "none"));
       } else {
         addRouteBtn.style.display = "none";
-        removeBtns.forEach(btn => btn.style.display = "none");
-        // Only keep one route
         while (routesContainer.children.length > 1) {
           routesContainer.removeChild(routesContainer.lastChild);
         }
         routeCount = 1;
         updateRouteNumbers();
+        // After updating, hide all remove buttons (in case header got re-rendered)
+        const removeBtns = document.querySelectorAll('.remove-route-btn');
+        removeBtns.forEach(btn => btn.style.display = "none");
       }
     }
+
 
     // Set up everything on page load
     window.onload = function() {
