@@ -142,7 +142,7 @@ def handle_dispatch():
             "- RPM is total revenue divided by total route miles (1 km = 0.621371 miles).\n"
             "- Format ALL tables as HTML tables only (no markdown).\n"
             "\nAdditionally:\n"
-            "- At the end, suggest strategic directions (city pairs or regions) where new loads would help create more 70%+ efficient routes (for example: 'If you had loads between X and Y, you could connect A and B with high efficiency') return this in clear HTML bullet points or chart style.\n"
+            "- At the end, suggest strategic directions (city pairs or regions) where new loads would help create more 70%+ efficient routes, including possibilities for chaining in between loads. (for example: 'If you had loads between X and Y, you could connect A and B with high efficiency') return this in clear HTML bullet points or chart style.\n"
             "- Do not generate hypothetical routes with unassigned loads, just give suggestions where possible new loads would increase efficient chaining.\n"
             "\nHere is the dispatch data (start_location, end_location, and all loads):\n"
             "Given the following `enriched_data` JSON, use this structure:\n"
