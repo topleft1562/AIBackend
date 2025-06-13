@@ -104,7 +104,7 @@ def handle_dispatch():
             reload_options = {
                 f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
-                    "deadhead_from_this_dropoff": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                    "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
                     "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
                 }
                 for other in loads if other["load_id"] != load["load_id"]
@@ -136,7 +136,7 @@ def handle_dispatch():
     "- For each route, calculates metrics as follows:\n"
     "    1. **Empty km**: Sum the following:\n"
     "       - The `deadhead_km` (distance from start_location to first load's pickup).\n"
-    "       - For each pair of consecutive loads in the route, add the `deadhead_from_this_dropoff` from the previous load's `reload_options`, using the next load's load_id as key.\n"
+    "       - For each pair of consecutive loads in the route, add the `deadhead_to_this_pickup` from the previous load's `reload_options`, using the next load's load_id as key.\n"
     "       - The `return_km` (distance from the last load's dropoff to end_location).\n"
     "    2. **Loaded km**: Sum each load's `loaded_km` (pickup to dropoff).\n"
     "    3. **Total km**: loaded km + empty km.\n"
@@ -147,7 +147,7 @@ def handle_dispatch():
     "\n"
     "**Important Calculation Recipe:**\n"
     "For a route like: Load A → Load B → Load C:\n"
-    "- Empty km = deadhead_km (start to A.pickup) + deadhead_from_this_dropoff (A.dropoff to B.pickup) + deadhead_from_this_dropoff (B.dropoff to C.pickup) + return_km (C.dropoff to end)\n"
+    "- Empty km = deadhead_km (start to A.pickup) + deadhead_to_this_pickup (from reload option A for B) + deadhead_to_this_pickup (from reload option B for C) + return_km (C.dropoff to end)\n"
     "- Loaded km = loaded_km for A + B + C\n"
     "\n"
     "Present each qualifying route as an HTML table row, showing:\n"
@@ -160,7 +160,7 @@ def handle_dispatch():
     "- start_location (string): Starting city.\n"
     "- end_location (string): Ending city.\n"
     "- loads (array): Each with:\n"
-    "  - load_id (int), pickup (string), dropoff (string), revenue (float), deadhead_km (float), loaded_km (float), return_km (float), reload_options (dict of next load_id: {'pickup', 'deadhead_from_this_dropoff', 'loaded_km'})\n"
+    "  - load_id (int), pickup (string), dropoff (string), revenue (float), deadhead_km (float), loaded_km (float), return_km (float), reload_options (dict of next load_id: {'pickup', 'deadhead_to_this_pickup': empty kms to this pickup, 'loaded_km': loaded kms for this load})\n"
     "\n"
     "Here is the enriched_data:\n"
     f"{json.dumps(enriched_data, indent=2)}"
