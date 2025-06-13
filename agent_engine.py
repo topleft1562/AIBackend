@@ -7,7 +7,7 @@ from llama_index.core.tools import FunctionTool
 load_dotenv()
 
 llm = OpenAI(
-    model="gpt-4.1-mini",
+    model="gpt-4.1",
 )
 
 def get_agent_runner():
