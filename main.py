@@ -141,6 +141,8 @@ def handle_dispatch():
             "- RPM is total revenue divided by total route miles (1 km = 0.621371 miles).\n"
             "- Format ALL tables as HTML tables only (no markdown).\n"
             "\nAdditionally:\n"
+            "- After the table, list only the strategic suggestions for what type of new loads or city pairs would allow more routes to qualify at 70%+ loaded km. Do not include any analysis, step-by-step reasoning, or explanations above or below the table and suggestions.\n"
+            "- Do not explain the calculations—just show the table and the list of suggestions. No commentary, no summaries, no extra text, no section headers. HTML table first, then suggestions as a bullet list."
             "- At the end, suggest strategic directions (city pairs or regions) where new loads would help create more 70%+ efficient routes (for example: 'If you had loads between X and Y, you could connect A and B with high efficiency').\n"
             "- Do not generate hypothetical routes with unassigned loads, just give suggestions where possible new loads would increase efficient chaining.\n"
             "\nHere is the dispatch data (start_location, end_location, and all loads):\n"
