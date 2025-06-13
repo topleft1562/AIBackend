@@ -43,6 +43,7 @@
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
       <option value="best">Best Route (AI Optimized)</option>
+      <option value="manual">Best Route (Manual)</option>
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
 
@@ -251,8 +252,11 @@
       try {
         let endpoint;
         let payload;
-        if (currentRouteMode === "direct") {
-          endpoint = "/direct_route_multi"; // <-- You will need this backend endpoint!
+        if (currentRouteMode === "manual") {
+          endpoint = "/manual";
+          payload = { ...dataToSend[0] };  // Only the first route
+        } else if (currentRouteMode === "direct") {
+          endpoint = "/direct_route_multi";
           payload = { routes: dataToSend };
         } else {
           endpoint = "/dispatch";

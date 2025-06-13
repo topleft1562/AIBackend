@@ -5,7 +5,7 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-
+import itertools
 
 app = Flask(__name__)
 
@@ -130,6 +130,8 @@ def handle_dispatch():
     "You are Dispatchy, a logistics planning expert. "
     "You are given load and distance data (`enriched_data`) describing possible freight loads, their cities, and the distances between all relevant points.\n"
     "\n"
+    "Consider every possible sequence (order) of loads—do not limit to just one or two orders. For example, if there are three loads, test all possible chaining orders (such as 1-2-3, 1-3-2, 2-1-3, etc.)."
+    "Explicitly enumerate all possible orderings and include all qualifying routes."
     "Your goal is to calculate EVERY possible valid route (any order, no repeats, all combinations some single loads to all chained together.) that:\n"
     "- Starts at `start_location` and ends at `end_location`.\n"
     "- For each route, calculates metrics as follows:\n"
@@ -380,6 +382,189 @@ def compute_direct_route_info(route, route_num=1):
         "loaded_pct": loaded_pct, "total_revenue": total_revenue, "rpm": rpm,
         "hourly_rate": hourly_rate
     }, table
+
+
+def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
+    start = enriched_data["start_location"]
+    end = enriched_data["end_location"]
+    loads = enriched_data["loads"]
+    n = len(loads)
+    id_to_load = {load["load_id"]: load for load in loads}
+    results = []
+
+    # Generate all route lengths (1 to n)
+    for r in range(1, n+1):
+        for perm in itertools.permutations(loads, r):
+            # Check for unique load_ids (should always be true with permutations)
+            load_ids = [load["load_id"] for load in perm]
+            # Initial deadhead
+            empty_km = perm[0]["deadhead_km"]
+            loaded_km = perm[0]["loaded_km"]
+            revenue = perm[0].get("revenue", 0.0)
+            city_steps = [f"<span style='color:green'>{start}</span>"]
+            # First pickup (blue), first dropoff (red)
+            city_steps.append(f"<span style='color:blue'>{perm[0]['pickup']}</span>")
+            city_steps.append(f"<span style='color:red'>{perm[0]['dropoff']}</span>")
+            # Add reloads and subsequent loads
+            for i in range(1, len(perm)):
+                prev = perm[i-1]
+                curr = perm[i]
+                # Use reload_options from prev to curr
+                reload_key = f"load_{curr['load_id']}"
+                reload_info = prev["reload_options"].get(reload_key)
+                if not reload_info:
+                    # Can't chain, so skip this permutation
+                    break
+                empty_km += reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
+                loaded_km += curr["loaded_km"]
+                revenue += curr.get("revenue", 0.0)
+                city_steps.append(f"<span style='color:blue'>{curr['pickup']}</span>")
+                city_steps.append(f"<span style='color:red'>{curr['dropoff']}</span>")
+            else:  # Only execute if no break (all reloads valid)
+                # Add return_km from last load's dropoff to end_location
+                empty_km += perm[-1]["return_km"]
+                city_steps.append(f"<span style='color:red'>{end}</span>")
+                total_km = loaded_km + empty_km
+                loaded_pct = loaded_km / total_km if total_km else 0
+                total_miles = total_km * 0.621371
+                rpm = (revenue / total_miles) if total_miles else 0
+
+                if loaded_pct >= loaded_pct_threshold:
+                    results.append({
+                        "city_sequence": " → ".join(city_steps),
+                        "load_ids": load_ids,
+                        "loaded_km": round(loaded_km, 1),
+                        "empty_km": round(empty_km, 1),
+                        "loaded_pct": round(loaded_pct * 100, 1),
+                        "total_km": round(total_km, 1),
+                        "revenue": round(revenue, 2),
+                        "rpm": round(rpm, 2)
+                    })
+
+    # Sort routes (e.g., by loaded % descending, then revenue descending)
+    results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
+    return results
+
+@app.route("/manual", methods=["POST"])
+def handle_manual_routes():
+    data = request.json
+    loads = data.get("loads", [])
+    start_location = data.get("start", "Brandon, MB")
+    end_location = data.get("end", "Brandon, MB")
+
+    if not loads:
+        return jsonify({"error": "Missing loads in request."}), 400
+
+    try:
+        start = normalize_city(start_location)
+        end = normalize_city(end_location)
+
+        # -- Data prep as before --
+        for i, load in enumerate(loads):
+            load["load_id"] = i + 1
+            load["pickupCity"] = normalize_city(load["pickupCity"])
+            load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            load["rate"] = float(load.get("rate", 0))
+            load["weight"] = float(load.get("weight", 0))
+            load["revenue"] = load["rate"] * load["weight"]
+
+        city_pairs = set()
+        for load in loads:
+            pickup = load["pickupCity"]
+            dropoff = load["dropoffCity"]
+            city_pairs.update({(start, pickup), (pickup, dropoff), (dropoff, end)})
+            for other in loads:
+                city_pairs.add((dropoff, other["pickupCity"]))
+
+        origin_dest_map = defaultdict(set)
+        for origin, dest in city_pairs:
+            origin_dest_map[origin].add(dest)
+        for origin, dests in origin_dest_map.items():
+            get_distances_batch(origin, list(dests))
+
+        result = []
+        for load in loads:
+            pickup = load["pickupCity"]
+            dropoff = load["dropoffCity"]
+            reload_options = {
+                f"load_{other['load_id']}": {
+                    "pickup": other["pickupCity"],
+                    "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                    "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                }
+                for other in loads if other["load_id"] != load["load_id"]
+            }
+            result.append({
+                "load_id": load["load_id"],
+                "pickup": pickup,
+                "dropoff": dropoff,
+                "revenue": load["revenue"],
+                "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
+                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 1)),
+                "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
+                "reload_options": reload_options,
+            })
+        enriched_data = {
+           "start_location": start,
+           "end_location": end,
+            "loads": result
+        }
+
+        routes = enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65)
+
+        # ---- HTML TABLE RENDER ----
+        if routes:
+            table_html = """<table>
+            <tr>
+              <th>City Sequence</th>
+              <th>Load IDs</th>
+              <th>Loaded km</th>
+              <th>Empty km</th>
+              <th>Loaded %</th>
+              <th>Total km</th>
+              <th>Revenue</th>
+              <th>RPM ($/mile)</th>
+            </tr>
+            """
+            for route in routes:
+                table_html += f"<tr><td>{route['city_sequence']}</td><td>{', '.join(map(str,route['load_ids']))}</td><td>{route['loaded_km']}</td><td>{route['empty_km']}</td><td>{route['loaded_pct']}%</td><td>{route['total_km']}</td><td>{route['revenue']}</td><td>{route['rpm']}</td></tr>"
+            table_html += "</table>"
+        else:
+            table_html = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>"
+
+        return render_template_string(f"""
+            <html>
+                <head>
+                    <style>
+                        table {{
+                            border-collapse: collapse;
+                            margin: 16px 0;
+                            font-size: 15px;
+                            width: 100%;
+                            background: #fff;
+                        }}
+                        th, td {{
+                            border: 1px solid #bbb;
+                            padding: 6px 10px;
+                            text-align: center;
+                        }}
+                        th {{
+                            background: #f4f4f4;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <h2>Manual Best Route(s)</h2>
+                    {table_html}
+                </body>
+            </html>
+        """)
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
 
 
 @app.route("/")
