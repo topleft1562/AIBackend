@@ -144,6 +144,8 @@ def handle_dispatch():
     "    5. **Revenue**: For each load, revenue = rate × weight; total revenue is sum of all loads in the route.\n"
     "    6. **RPM ($/mile)**: total revenue / (total km × 0.621371).\n"
     "- Only output routes that are 65% loaded or higher.\n"
+    "- DO NOT include or list any routes where loaded % is less than 65%. "
+    "- DO NOT explain, show, or mention any route below the threshold—only show those that qualify."
     "\n"
     "**Important Calculation Recipe:**\n"
     "For a route like: Load A → Load B → Load C:\n"
