@@ -136,7 +136,9 @@ def handle_dispatch():
             "    • Have loaded_km / total_km >= 0.7 (70% or higher loaded ratio)\n"
             "    • Not require every load to be assigned (ignore loads that do not fit this criteria)\n"
             "- Show as many qualifying route options as possible—each can use as many or as few loads as needed.\n"
-            "- For each route, show the load_ids in sequence, the loaded km, empty km, loaded %, and all calculated distances.\n"
+            "- For each route, show the load_ids in sequence, the loaded km, empty km, loaded %, total km, total revenue, and RPM ($/mile).\n"
+            "- For each load, revenue = rate × weight. For each route, total revenue is the sum of revenues for all assigned loads.\n"
+            "- RPM is total revenue divided by total route miles (1 km = 0.621371 miles).\n"
             "- Format ALL tables as HTML tables only (no markdown).\n"
             "\nAdditionally:\n"
             "- At the end, suggest strategic directions (city pairs or regions) where new loads would help create more 70%+ efficient routes (for example: 'If you had loads between X and Y, you could connect A and B with high efficiency').\n"
@@ -144,6 +146,7 @@ def handle_dispatch():
             "\nHere is the dispatch data (start_location, end_location, and all loads):\n"
             f"{json.dumps(enriched_data, indent=2)}"
         )
+
 
 
         response = agent.chat(prompt)
