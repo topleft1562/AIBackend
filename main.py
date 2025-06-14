@@ -515,6 +515,7 @@ def handle_manual_routes():
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 1)),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
                 "reload_options": reload_options,
+                "required": load.get("required", False),
             })
         enriched_data = {
            "start_location": start,
