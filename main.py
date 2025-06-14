@@ -5,7 +5,6 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, request, jsonify, render_template, render_template_string
 from collections import defaultdict
-import itertools
 
 app = Flask(__name__)
 
@@ -385,18 +384,21 @@ def compute_direct_route_info(route, route_num=1):
 
 
 def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
+    import itertools  # Needed for larger sets, keep if using in your codebase
+
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
-    n = len(loads)
     results = []
+    required_ids = {load["load_id"] for load in loads if load.get("required")}
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
         if path:
             # Always add return_km for last load
             total_km = loaded_km + empty_km + path[-1]["return_km"]
             loaded_pct = loaded_km / total_km if total_km else 0
-            if loaded_pct >= loaded_pct_threshold:
+            route_ids = {l["load_id"] for l in path}
+            if loaded_pct >= loaded_pct_threshold and required_ids.issubset(route_ids):
                 # Build city_steps up to here plus end
                 seq = city_steps + [f"<span style='color:red'>{end}</span>"]
                 total_miles = total_km * 0.621371
@@ -412,11 +414,10 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
                     "rpm": round(rpm, 2),
                 })
             # Prune if even the max possible loaded pct is now below threshold
-            # e.g. (loaded_km + sum of all remaining loaded_kms) / (total_km + sum of all remaining loaded_kms)
             remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
             possible_total = loaded_km + remaining_loaded
             possible_km = total_km + remaining_loaded
-            if possible_total / possible_km < loaded_pct_threshold:
+            if possible_km and (possible_total / possible_km < loaded_pct_threshold):
                 return  # Can't recover above threshold, prune
 
         # Try adding each unused load
@@ -456,6 +457,7 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
     # Sort routes (by loaded % then revenue)
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
+
 
 @app.route("/manual", methods=["POST"])
 def handle_manual_routes():

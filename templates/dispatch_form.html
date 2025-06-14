@@ -128,15 +128,20 @@
 
     function addLoadRow(routeBtn) {
       const loadsContainer = routeBtn.closest('.route-block').querySelector('.loadsContainer');
+      const isManualMode = (currentRouteMode === "manual");
       const row = document.createElement('div');
       row.className = "load-row";
       row.innerHTML = `
-        <input type="text" name="pickup" placeholder="Pickup City" required />
+       <input type="text" name="pickup" placeholder="Pickup City" required />
         <input type="text" name="dropoff" placeholder="Dropoff City" required />
-        <input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />
+        ${isManualMode ? 
+          `<input type="hidden" name="count" value="1" />` : 
+          `<input type="number" name="count" placeholder="# of Loads" value="1" min="1" required />`
+        }
         <input type="number" name="rate" placeholder="Rate" value="0" min="0" step="0.01" required />
         <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="43" required />
-        <button type="button" onclick="removeLoadRow(this)">❌</button>
+        <input type="checkbox" name="required" style="margin-left:6px;" />
+          <button type="button" onclick="removeLoadRow(this)">❌</button>
       `;
       loadsContainer.appendChild(row);
     }
@@ -160,6 +165,20 @@
       const addRouteBtn = document.getElementById("addRouteBtn");
       const routesContainer = document.getElementById("routesContainer");
       const blocks = document.querySelectorAll('.route-block');
+
+      // Update the load-header to match current mode
+      const headers = document.querySelectorAll('.load-header');
+        headers.forEach(header => {
+          header.innerHTML = `
+            <span>Pickup</span>
+            <span>Dropoff</span>
+            ${currentRouteMode === "manual" ? "" : "<span># of Loads</span>"}
+            <span>Rate ($/MT)</span>
+            <span>Weight (MT)</span>
+            <span>Required?</span>
+            <span></span>
+          `;
+        });
 
       // Toggle required attribute on Start/End inputs per mode
       blocks.forEach(block => {
@@ -224,11 +243,12 @@
         const counts = routeDiv.querySelectorAll("input[name='count']");
         const rates = routeDiv.querySelectorAll("input[name='rate']");
         const weights = routeDiv.querySelectorAll("input[name='weight']");
+        const isManualMode = (currentRouteMode === "manual");
         const loads = [];
         for (let i = 0; i < pickups.length; i++) {
           const pickup = pickups[i].value.trim();
           const dropoff = dropoffs[i].value.trim();
-          const count = parseInt(counts[i].value);
+          const count = isManualMode ? 1 : parseInt(counts[i].value);
           const rate = parseFloat(rates[i].value);
           const weight = parseFloat(weights[i].value);
           for (let j = 0; j < count; j++) {
