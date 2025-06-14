@@ -384,8 +384,6 @@ def compute_direct_route_info(route, route_num=1):
 
 
 def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
-    import itertools  # Needed for larger sets, keep if using in your codebase
-
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -394,12 +392,10 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
         if path:
-            # Always add return_km for last load
             total_km = loaded_km + empty_km + path[-1]["return_km"]
             loaded_pct = loaded_km / total_km if total_km else 0
             route_ids = {l["load_id"] for l in path}
             if loaded_pct >= loaded_pct_threshold and required_ids.issubset(route_ids):
-                # Build city_steps up to here plus end
                 seq = city_steps + [f"<span style='color:red'>{end}</span>"]
                 total_miles = total_km * 0.621371
                 rpm = (revenue / total_miles) if total_miles else 0
@@ -413,19 +409,23 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
                     "revenue": round(revenue, 2),
                     "rpm": round(rpm, 2),
                 })
-            # Prune if even the max possible loaded pct is now below threshold
+            # Prune if max possible loaded pct is now below threshold
             remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
             possible_total = loaded_km + remaining_loaded
             possible_km = total_km + remaining_loaded
             if possible_km and (possible_total / possible_km < loaded_pct_threshold):
                 return  # Can't recover above threshold, prune
 
-        # Try adding each unused load
+        # --- EARLY PRUNE for required loads ---
+        remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
+        remaining_required = required_ids - set([l["load_id"] for l in path])
+        if len(remaining_unused) < len(remaining_required):
+            return  # Not enough loads left to satisfy required set
+
         for load in loads:
             lid = load["load_id"]
             if lid in used_ids:
                 continue
-            # If no previous, this is first load
             if not path:
                 new_empty = load["deadhead_km"]
                 new_loaded = load["loaded_km"]
@@ -451,12 +451,10 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
                 ]
                 search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
 
-    # Start search
     search([], set(), 0, 0, 0, [])
-
-    # Sort routes (by loaded % then revenue)
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
+
 
 
 @app.route("/manual", methods=["POST"])
