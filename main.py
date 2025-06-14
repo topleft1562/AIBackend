@@ -389,59 +389,71 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
     n = len(loads)
-    id_to_load = {load["load_id"]: load for load in loads}
     results = []
 
-    # Generate all route lengths (1 to n)
-    for r in range(1, n+1):
-        for perm in itertools.permutations(loads, r):
-            # Check for unique load_ids (should always be true with permutations)
-            load_ids = [load["load_id"] for load in perm]
-            # Initial deadhead
-            empty_km = perm[0]["deadhead_km"]
-            loaded_km = perm[0]["loaded_km"]
-            revenue = perm[0].get("revenue", 0.0)
-            city_steps = [f"<span style='color:green'>{start}</span>"]
-            # First pickup (blue), first dropoff (red)
-            city_steps.append(f"<span style='color:blue'>{perm[0]['pickup']}</span>")
-            city_steps.append(f"<span style='color:red'>{perm[0]['dropoff']}</span>")
-            # Add reloads and subsequent loads
-            for i in range(1, len(perm)):
-                prev = perm[i-1]
-                curr = perm[i]
-                # Use reload_options from prev to curr
-                reload_key = f"load_{curr['load_id']}"
-                reload_info = prev["reload_options"].get(reload_key)
-                if not reload_info:
-                    # Can't chain, so skip this permutation
-                    break
-                empty_km += reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
-                loaded_km += curr["loaded_km"]
-                revenue += curr.get("revenue", 0.0)
-                city_steps.append(f"<span style='color:blue'>{curr['pickup']}</span>")
-                city_steps.append(f"<span style='color:red'>{curr['dropoff']}</span>")
-            else:  # Only execute if no break (all reloads valid)
-                # Add return_km from last load's dropoff to end_location
-                empty_km += perm[-1]["return_km"]
-                city_steps.append(f"<span style='color:red'>{end}</span>")
-                total_km = loaded_km + empty_km
-                loaded_pct = loaded_km / total_km if total_km else 0
+    def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
+        if path:
+            # Always add return_km for last load
+            total_km = loaded_km + empty_km + path[-1]["return_km"]
+            loaded_pct = loaded_km / total_km if total_km else 0
+            if loaded_pct >= loaded_pct_threshold:
+                # Build city_steps up to here plus end
+                seq = city_steps + [f"<span style='color:red'>{end}</span>"]
                 total_miles = total_km * 0.621371
                 rpm = (revenue / total_miles) if total_miles else 0
+                results.append({
+                    "city_sequence": " → ".join(seq),
+                    "load_ids": [l["load_id"] for l in path],
+                    "loaded_km": round(loaded_km, 1),
+                    "empty_km": round(empty_km + path[-1]["return_km"], 1),
+                    "loaded_pct": round(loaded_pct * 100, 1),
+                    "total_km": round(total_km, 1),
+                    "revenue": round(revenue, 2),
+                    "rpm": round(rpm, 2),
+                })
+            # Prune if even the max possible loaded pct is now below threshold
+            # e.g. (loaded_km + sum of all remaining loaded_kms) / (total_km + sum of all remaining loaded_kms)
+            remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
+            possible_total = loaded_km + remaining_loaded
+            possible_km = total_km + remaining_loaded
+            if possible_total / possible_km < loaded_pct_threshold:
+                return  # Can't recover above threshold, prune
 
-                if loaded_pct >= loaded_pct_threshold:
-                    results.append({
-                        "city_sequence": " → ".join(city_steps),
-                        "load_ids": load_ids,
-                        "loaded_km": round(loaded_km, 1),
-                        "empty_km": round(empty_km, 1),
-                        "loaded_pct": round(loaded_pct * 100, 1),
-                        "total_km": round(total_km, 1),
-                        "revenue": round(revenue, 2),
-                        "rpm": round(rpm, 2)
-                    })
+        # Try adding each unused load
+        for load in loads:
+            lid = load["load_id"]
+            if lid in used_ids:
+                continue
+            # If no previous, this is first load
+            if not path:
+                new_empty = load["deadhead_km"]
+                new_loaded = load["loaded_km"]
+                new_revenue = load.get("revenue", 0.0)
+                new_steps = [
+                    f"<span style='color:green'>{start}</span>",
+                    f"<span style='color:blue'>{load['pickup']}</span>",
+                    f"<span style='color:red'>{load['dropoff']}</span>",
+                ]
+                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
+            else:
+                prev = path[-1]
+                reload_key = f"load_{lid}"
+                reload_info = prev["reload_options"].get(reload_key)
+                if not reload_info:
+                    continue  # Can't chain
+                new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
+                new_loaded = loaded_km + load["loaded_km"]
+                new_revenue = revenue + load.get("revenue", 0.0)
+                new_steps = city_steps + [
+                    f"<span style='color:blue'>{load['pickup']}</span>",
+                    f"<span style='color:red'>{load['dropoff']}</span>",
+                ]
+                search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
 
-    # Sort routes (e.g., by loaded % descending, then revenue descending)
+    # Start search
+    search([], set(), 0, 0, 0, [])
+
+    # Sort routes (by loaded % then revenue)
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
 
