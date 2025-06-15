@@ -468,6 +468,8 @@ def handle_manual_routes():
                 "pickup": pickup,
                 "dropoff": dropoff,
                 "revenue": load["revenue"],
+                "rate": load["rate"],
+                "weight": load["weight"],
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
                 "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
@@ -485,22 +487,28 @@ def handle_manual_routes():
         # For each summary route, expand to breakdown like direct
         expanded = []
         for idx, route in enumerate(routes):
-            # Create a dummy trip for compute_direct_route_info
             trip_loads = []
             for lid in route["load_ids"]:
-                # find load by id
                 found = next((l for l in result if l["load_id"] == lid), None)
                 if found:
                     trip_loads.append({
                         "pickupCity": found["pickup"],
                         "dropoffCity": found["dropoff"],
-                        "rate": 0,  # real value if needed
-                        "weight": 0  # real value if needed
+                        "rate": found.get("rate", 0),
+                        "weight": found.get("weight", 0)
                     })
             trip_route = {"start": start, "end": end, "loads": trip_loads}
             summary, step_breakdown = compute_direct_route_info(trip_route)
             route["step_breakdown"] = step_breakdown
             route["summary"] = summary
+            # Overwrite the top-level fields with computed breakdown
+            route["loaded_km"] = summary["loaded_km"]
+            route["empty_km"] = summary["empty_km"]
+            route["total_km"] = summary["total_km"]
+            route["loaded_pct"] = summary["loaded_pct"]
+            route["revenue"] = summary["total_revenue"]
+            route["rpm"] = summary["rpm"]
+            route["hourly_rate"] = summary["hourly_rate"]
             expanded.append(route)
 
         return jsonify(expanded)
