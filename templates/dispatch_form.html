@@ -14,45 +14,43 @@
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
     .load-header span,
-    .load-row input { 
-      min-width: 130px;
-      max-width: 130px;
-      width: 130px;
-      margin-right: 0;
-      text-align: left;
-    }
+    .load-row input { min-width: 130px; max-width: 130px; width: 130px; margin-right: 0; text-align: left; }
     .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
     .load-row button { margin-left: 5px; min-width: 32px; }
-    #spinner {
-      display: none;
-      margin: 30px auto;
-      text-align: center;
-    }
-    #spinner svg {
-      animation: spin 1s linear infinite;
-    }
+    #spinner { display: none; margin: 30px auto; text-align: center; }
+    #spinner svg { animation: spin 1s linear infinite; }
     @keyframes spin { 100% { transform: rotate(360deg); } }
     #addRouteBtn { display: inline-block; margin-bottom: 10px; }
     .remove-route-btn { float: right; color: #e53e3e; display: inline; }
+    .sort-toggle { margin-bottom: 10px; font-size: 16px; }
+    .results-table { border-collapse: collapse; width: 100%; margin: 18px 0; background: #fff; }
+    .results-table th, .results-table td { border: 1px solid #bbb; padding: 6px 10px; text-align: center; }
+    .results-table th { background: #f4f4f4; }
   </style>
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
-    <!-- Route type selector -->
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
       <option value="best">Best Route (AI Optimized)</option>
       <option value="manual">Best Route (Manual)</option>
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
-
-    <div id="routesContainer">
-      <!-- Route blocks go here -->
-    </div>
+    <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
   </form>
+
+  <!-- Sorting toggle for manual mode -->
+  <div id="sortToggleDiv" class="sort-toggle" style="display:none;">
+    <label>Sort By:
+      <select id="sortToggle">
+        <option value="loaded_pct">Loaded % (High to Low)</option>
+        <option value="rpm">RPM ($/mile, High to Low)</option>
+      </select>
+    </label>
+  </div>
 
   <div id="spinner">
     <svg width="50" height="50" viewBox="0 0 50 50">
@@ -79,6 +77,7 @@
   <script>
     let routeCount = 0;
     let currentRouteMode = "direct"; // Default to direct
+    let manualResultsCache = []; // Store manual results for sorting
 
     function addRouteBlock() {
       routeCount += 1;
@@ -86,21 +85,18 @@
       const routeDiv = document.createElement('div');
       routeDiv.className = "route-block";
       routeDiv.dataset.routeIndex = routeCount;
-
       routeDiv.innerHTML = `
         <h3>Route ${routeCount} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button></h3>
         <label>Start Location:</label>
         <input type="text" name="start" placeholder="Starting Point" required />
-
         <label>End Location:</label>
         <input type="text" name="end" placeholder="Ending Point" required />
-
         <div class="load-header"></div>
         <div class="loadsContainer"></div>
         <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
       `;
       routesContainer.appendChild(routeDiv);
-      renderLoadHeaderAndRows(routeDiv, true); // true: do not preserve required
+      renderLoadHeaderAndRows(routeDiv, true);
       updateRouteUI();
     }
 
@@ -167,7 +163,6 @@
         <span></span>
       `;
       header.innerHTML = headerHtml;
-
       // Update each row in loadsContainer to match current mode (preserve values, but always reset required on mode switch)
       const loadsContainer = routeDiv.querySelector('.loadsContainer');
       const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
@@ -176,7 +171,7 @@
         dropoff: row.querySelector("input[name='dropoff']").value,
         rate: row.querySelector("input[name='rate']").value,
         weight: row.querySelector("input[name='weight']").value,
-        required: false, // always clear required on mode switch!
+        required: false,
         count: row.querySelector("input[name='count']") ? row.querySelector("input[name='count']").value : "1"
       }));
       loadsContainer.innerHTML = "";
@@ -184,16 +179,11 @@
       if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
     }
 
-    // Handle mode switch UI logic
     function updateRouteUI() {
       const addRouteBtn = document.getElementById("addRouteBtn");
       const routesContainer = document.getElementById("routesContainer");
       const blocks = document.querySelectorAll('.route-block');
-
-      // Update all headers and load rows to match mode. Always reset required!
       blocks.forEach(block => renderLoadHeaderAndRows(block, true));
-
-      // Toggle required attribute on Start/End inputs per mode
       blocks.forEach(block => {
         const startInput = block.querySelector("input[name='start']");
         const endInput = block.querySelector("input[name='end']");
@@ -205,7 +195,6 @@
           endInput.setAttribute("required", "required");
         }
       });
-
       if (currentRouteMode === "direct") {
         addRouteBtn.style.display = "inline-block";
         const removeBtns = document.querySelectorAll('.remove-route-btn');
@@ -217,27 +206,19 @@
         }
         routeCount = 1;
         updateRouteNumbers();
-        // After updating, hide all remove buttons (in case header got re-rendered)
         const removeBtns = document.querySelectorAll('.remove-route-btn');
         removeBtns.forEach(btn => btn.style.display = "none");
       }
+      // Show/hide sort toggle for manual mode
+      document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
     }
 
-    // Set up everything on page load
-    window.onload = function() {
-      addRouteBlock(); // Always start with one
-      document.getElementById("routeMode").value = "direct";
-      updateRouteUI();
-      document.getElementById('routeMode').addEventListener('change', function() {
-        currentRouteMode = this.value;
-        updateRouteUI();
-      });
-    };
-
+    // -- MAIN SUBMIT HANDLER --
     document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       document.getElementById("output").innerHTML = "";
       document.getElementById("spinner").style.display = "block";
+      manualResultsCache = [];
 
       // Collect all route blocks
       const routeBlocks = document.querySelectorAll('.route-block');
@@ -246,12 +227,8 @@
       for (const routeDiv of routeBlocks) {
         const pickups = routeDiv.querySelectorAll("input[name='pickup']");
         const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
-
-        // Get raw values first
         let start = routeDiv.querySelector("input[name='start']").value.trim();
         let end = routeDiv.querySelector("input[name='end']").value.trim();
-
-        // Gather all loads as before
         const counts = routeDiv.querySelectorAll("input[name='count']");
         const rates = routeDiv.querySelectorAll("input[name='rate']");
         const weights = routeDiv.querySelectorAll("input[name='weight']");
@@ -270,26 +247,22 @@
             loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required });
           }
         }
-
-        // Only for direct route mode: fill start/end if blank
         if (currentRouteMode === "direct") {
           if (!start && loads.length) {
-            start = loads[0].pickupCity || "";  // First pickup
+            start = loads[0].pickupCity || "";
           }
           if (!end && loads.length) {
-            end = loads[loads.length - 1].dropoffCity || ""; // Last dropoff
+            end = loads[loads.length - 1].dropoffCity || "";
           }
         }
-
         dataToSend.push({ start, end, loads });
       }
 
       try {
-        let endpoint;
-        let payload;
+        let endpoint, payload;
         if (currentRouteMode === "manual") {
           endpoint = "/manual";
-          payload = { ...dataToSend[0] };  // Only the first route
+          payload = { ...dataToSend[0] };
         } else if (currentRouteMode === "direct") {
           endpoint = "/direct_route_multi";
           payload = { routes: dataToSend };
@@ -302,14 +275,77 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const html = await response.text();
-        document.getElementById("output").innerHTML = html;
+
+        // -- HANDLE RESPONSE --
+        if (currentRouteMode === "manual" || currentRouteMode === "direct") {
+          const data = await response.json();
+          if (data.error) throw new Error(data.error);
+          manualResultsCache = data.routes;
+          renderResultsTable(manualResultsCache);
+        } else {
+          // For AI mode, just render the HTML directly
+          const html = await response.text();
+          document.getElementById("output").innerHTML = html;
+        }
       } catch (err) {
-        document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.</div>";
+        document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
       } finally {
         document.getElementById("spinner").style.display = "none";
       }
     });
+
+    // -- SORT TOGGLE FOR MANUAL MODE --
+    document.getElementById("sortToggle").addEventListener("change", function() {
+      if (manualResultsCache.length) renderResultsTable(manualResultsCache);
+    });
+
+    function renderResultsTable(routes) {
+      if (!routes.length) {
+        document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
+        return;
+      }
+      let sortBy = document.getElementById("sortToggle").value;
+      let sorted = [...routes].sort((a, b) => {
+        if (sortBy === "loaded_pct") return b.loaded_pct - a.loaded_pct;
+        if (sortBy === "rpm") return b.rpm - a.rpm;
+        return 0;
+      });
+      let ths = `<tr>
+        <th>City Sequence</th>
+        <th>Load IDs</th>
+        <th>Loaded km</th>
+        <th>Empty km</th>
+        <th>Loaded %</th>
+        <th>Total km</th>
+        <th>Revenue</th>
+        <th>RPM ($/mile)</th>
+      </tr>`;
+      let trs = sorted.map(r =>
+        `<tr>
+          <td>${r.city_sequence || ""}</td>
+          <td>${Array.isArray(r.load_ids) ? r.load_ids.join(", ") : ""}</td>
+          <td>${r.loaded_km}</td>
+          <td>${r.empty_km}</td>
+          <td>${r.loaded_pct}%</td>
+          <td>${r.total_km}</td>
+          <td>${r.revenue}</td>
+          <td>${r.rpm}</td>
+        </tr>`
+      ).join("");
+      document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
+    }
+
+    // Set up everything on page load
+    window.onload = function() {
+      addRouteBlock(); // Always start with one
+      document.getElementById("routeMode").value = "direct";
+      updateRouteUI();
+      document.getElementById('routeMode').addEventListener('change', function() {
+        currentRouteMode = this.value;
+        updateRouteUI();
+        document.getElementById("output").innerHTML = "";
+      });
+    };
   </script>
 </body>
 </html>
