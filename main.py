@@ -3,7 +3,7 @@ import json
 import requests
 from urllib.parse import unquote
 from agent_engine import get_agent_runner
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, render_template, request, jsonify, render_template_string
 from collections import defaultdict
 
 app = Flask(__name__)
@@ -511,10 +511,7 @@ def handle_manual_routes():
 
 @app.route("/")
 def show_dispatch_form():
-    return render_template_string("""
-    <h1>Dispatchy Backend Running!</h1>
-    <p>Use your frontend to interact with endpoints.</p>
-    """)
+    return render_template("dispatch_form.html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
