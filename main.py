@@ -3,15 +3,14 @@ import json
 import requests
 from urllib.parse import unquote
 from agent_engine import get_agent_runner
-from flask import Flask, request, jsonify, render_template, render_template_string
+from flask import Flask, request, jsonify, render_template_string
 from collections import defaultdict
 
 app = Flask(__name__)
 
-# Initialize Dispatchy agent
+# Initialize LLM Agent for AI Mode
 agent = get_agent_runner()
 
-# Google API key
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 
 # Distance cache: ("origin|destination") => km
@@ -55,9 +54,180 @@ def get_distances_batch(origin, destinations):
     except Exception as e:
         print(f"Error fetching from {origin} to batch: {e}")
 
-# ---------- AI MODE (HTML OUTPUT) ----------
+def compute_direct_route_info(route, route_num=1):
+    start = normalize_city(route.get("start", ""))
+    end = normalize_city(route.get("end", ""))
+    loads = route.get("loads", [])
+
+    loaded_km = 0.0
+    empty_km = 0.0
+    total_revenue = 0.0
+    steps = []
+    num_loaded_legs = 0
+
+    if loads:
+        # Empty: Start -> first pickup
+        first_pickup = normalize_city(loads[0]["pickupCity"])
+        empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
+        empty_km += empty_to_first
+        steps.append({
+            "type": "empty",
+            "segment": f"{start} → {first_pickup}",
+            "kms": empty_to_first,
+            "rate": "-",
+            "weight": "-",
+            "revenue": "-",
+            "rpm": "0.00"
+        })
+        # Loaded and empty between loads
+        for i, load in enumerate(loads):
+            pickup = normalize_city(load["pickupCity"])
+            dropoff = normalize_city(load["dropoffCity"])
+            rate = float(load.get("rate", 0))
+            weight = float(load.get("weight", 0))
+            revenue = rate * weight
+            dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
+            loaded_km += dist
+            total_revenue += revenue
+            num_loaded_legs += 1
+            miles = dist * 0.621371
+            rpm = (revenue / miles) if miles else 0
+            steps.append({
+                "type": "loaded",
+                "segment": f"{pickup} → {dropoff}",
+                "kms": dist,
+                "rate": rate,
+                "weight": weight,
+                "revenue": revenue,
+                "rpm": f"{rpm:.2f}"
+            })
+            # Empty between this drop and next pickup (if not last)
+            if i < len(loads) - 1:
+                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
+                empty_km += deadhead
+                steps.append({
+                    "type": "empty",
+                    "segment": f"{dropoff} → {next_pickup}",
+                    "kms": deadhead,
+                    "rate": "-",
+                    "weight": "-",
+                    "revenue": "-",
+                    "rpm": "0.00"
+                })
+        # Empty: Last drop -> end
+        last_drop = normalize_city(loads[-1]["dropoffCity"])
+        empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
+        empty_km += empty_back
+        steps.append({
+            "type": "empty",
+            "segment": f"{last_drop} → {end}",
+            "kms": empty_back,
+            "rate": "-",
+            "weight": "-",
+            "revenue": "-",
+            "rpm": "0.00"
+        })
+
+    total_km = loaded_km + empty_km
+    loaded_pct = (loaded_km / total_km * 100) if total_km else 0
+    total_miles = total_km * 0.621371
+    rpm = (total_revenue / total_miles) if total_miles else 0
+
+    driving_hours = total_km / 85 if total_km else 0
+    total_hours = driving_hours + 2 * num_loaded_legs
+    hourly_rate = (total_revenue / total_hours) if total_hours else 0
+
+    summary = {
+        "route_num": route_num,
+        "start": start,
+        "end": end,
+        "loaded_km": round(loaded_km, 1),
+        "empty_km": round(empty_km, 1),
+        "total_km": round(total_km, 1),
+        "loaded_pct": round(loaded_pct, 1),
+        "total_revenue": round(total_revenue, 2),
+        "rpm": round(rpm, 2),
+        "hourly_rate": round(hourly_rate, 2)
+    }
+    return summary, steps
+
+def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
+    start = enriched_data["start_location"]
+    end = enriched_data["end_location"]
+    loads = enriched_data["loads"]
+    results = []
+    required_ids = {load["load_id"] for load in loads if load.get("required")}
+
+    def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
+        if path:
+            total_km = loaded_km + empty_km + path[-1]["return_km"]
+            loaded_pct = loaded_km / total_km if total_km else 0
+            route_ids = {l["load_id"] for l in path}
+            if loaded_pct >= loaded_pct_threshold and (not required_ids or required_ids.issubset(route_ids)):
+                seq = city_steps + [f"<span style='color:red'>{end}</span>"]
+                total_miles = total_km * 0.621371
+                rpm = (revenue / total_miles) if total_miles else 0
+                results.append({
+                    "city_sequence": " → ".join(seq),
+                    "load_ids": [l["load_id"] for l in path],
+                    "loaded_km": round(loaded_km, 1),
+                    "empty_km": round(empty_km + path[-1]["return_km"], 1),
+                    "loaded_pct": round(loaded_pct * 100, 1),
+                    "total_km": round(total_km, 1),
+                    "revenue": round(revenue, 2),
+                    "rpm": round(rpm, 2),
+                    "step_breakdown": []  # for frontend to optionally fill later
+                })
+            # Prune if max possible loaded pct is now below threshold
+            remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
+            possible_total = loaded_km + remaining_loaded
+            possible_km = total_km + remaining_loaded
+            if possible_km and (possible_total / possible_km < loaded_pct_threshold):
+                return  # Can't recover above threshold, prune
+
+        # --- EARLY PRUNE for required loads ---
+        remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
+        remaining_required = required_ids - set([l["load_id"] for l in path])
+        if len(remaining_unused) < len(remaining_required):
+            return  # Not enough loads left to satisfy required set
+
+        for load in loads:
+            lid = load["load_id"]
+            if lid in used_ids:
+                continue
+            if not path:
+                new_empty = load["deadhead_km"]
+                new_loaded = load["loaded_km"]
+                new_revenue = load.get("revenue", 0.0)
+                new_steps = [
+                    f"<span style='color:green'>{start}</span>",
+                    f"<span style='color:blue'>{load['pickup']}</span>",
+                    f"<span style='color:red'>{load['dropoff']}</span>",
+                ]
+                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
+            else:
+                prev = path[-1]
+                reload_key = f"load_{lid}"
+                reload_info = prev["reload_options"].get(reload_key)
+                if not reload_info:
+                    continue  # Can't chain
+                new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
+                new_loaded = loaded_km + load["loaded_km"]
+                new_revenue = revenue + load.get("revenue", 0.0)
+                new_steps = city_steps + [
+                    f"<span style='color:blue'>{load['pickup']}</span>",
+                    f"<span style='color:red'>{load['dropoff']}</span>",
+                ]
+                search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
+
+    search([], set(), 0, 0, 0, [])
+    results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
+    return results
+
 @app.route("/dispatch", methods=["POST"])
 def handle_dispatch():
+    # AI mode (HTML output)
     data = request.json
     loads = data.get("loads", [])
     start_location = data.get("start", "Brandon, MB")
@@ -115,11 +285,12 @@ def handle_dispatch():
                 "reload_options": reload_options,
             })
         enriched_data = {
-           "start_location": start,
-           "end_location": end,
+            "start_location": start,
+            "end_location": end,
             "loads": result
         }
 
+        # Prompt as before
         prompt = (
             "You are Dispatchy, a logistics planning expert. "
             "You are given load and distance data (`enriched_data`) describing possible freight loads, their cities, and the distances between all relevant points.\n"
@@ -170,7 +341,6 @@ def handle_dispatch():
             f"{json.dumps(enriched_data, indent=2)}"
         )
 
-
         response = agent.chat(prompt)
         html_output = response.response
 
@@ -201,81 +371,50 @@ def handle_dispatch():
                 </body>
             </html>
         """)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# ---------- ENUMERATE ROUTES (RE-USE FOR JSON ENDPOINTS) ----------
-def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
-    start = enriched_data["start_location"]
-    end = enriched_data["end_location"]
-    loads = enriched_data["loads"]
-    results = []
-    required_ids = {load["load_id"] for load in loads if load.get("required")}
+@app.route("/direct_route_multi", methods=["POST"])
+def direct_route_multi():
+    # Returns JSON list, one per trip
+    data = request.json
+    routes = data.get("routes", [])
+    if not routes:
+        return jsonify({"error": "No routes provided."}), 400
 
-    def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
-        if path:
-            total_km = loaded_km + empty_km + path[-1]["return_km"]
-            loaded_pct = loaded_km / total_km if total_km else 0
-            route_ids = {l["load_id"] for l in path}
-            if loaded_pct >= loaded_pct_threshold and required_ids.issubset(route_ids):
-                seq = city_steps + [f"<span style='color:red'>{end}</span>"]
-                total_miles = total_km * 0.621371
-                rpm = (revenue / total_miles) if total_miles else 0
-                results.append({
-                    "city_sequence": " → ".join(seq),
-                    "load_ids": [l["load_id"] for l in path],
-                    "loaded_km": round(loaded_km, 1),
-                    "empty_km": round(empty_km + path[-1]["return_km"], 1),
-                    "loaded_pct": round(loaded_pct * 100, 1),
-                    "total_km": round(total_km, 1),
-                    "revenue": round(revenue, 2),
-                    "rpm": round(rpm, 2),
-                })
-            remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
-            possible_total = loaded_km + remaining_loaded
-            possible_km = total_km + remaining_loaded
-            if possible_km and (possible_total / possible_km < loaded_pct_threshold):
-                return
+    city_pairs = set()
+    for route in routes:
+        start = normalize_city(route.get("start", ""))
+        end = normalize_city(route.get("end", ""))
+        loads = route.get("loads", [])
+        if loads:
+            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
+            for load in loads:
+                pickup = normalize_city(load["pickupCity"])
+                dropoff = normalize_city(load["dropoffCity"])
+                city_pairs.add((pickup, dropoff))
+            for i in range(len(loads) - 1):
+                prev_drop = normalize_city(loads[i]["dropoffCity"])
+                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                city_pairs.add((prev_drop, next_pickup))
+            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
 
-        remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
-        remaining_required = required_ids - set([l["load_id"] for l in path])
-        if len(remaining_unused) < len(remaining_required):
-            return
+    origin_dest_map = defaultdict(set)
+    for origin, dest in city_pairs:
+        origin_dest_map[origin].add(dest)
+    for origin, dests in origin_dest_map.items():
+        get_distances_batch(origin, list(dests))
 
-        for load in loads:
-            lid = load["load_id"]
-            if lid in used_ids:
-                continue
-            if not path:
-                new_empty = load["deadhead_km"]
-                new_loaded = load["loaded_km"]
-                new_revenue = load.get("revenue", 0.0)
-                new_steps = [
-                    f"<span style='color:green'>{start}</span>",
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
-                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
-            else:
-                prev = path[-1]
-                reload_key = f"load_{lid}"
-                reload_info = prev["reload_options"].get(reload_key)
-                if not reload_info:
-                    continue
-                new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
-                new_loaded = loaded_km + load["loaded_km"]
-                new_revenue = revenue + load.get("revenue", 0.0)
-                new_steps = city_steps + [
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
-                search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
+    all_results = []
+    for idx, route in enumerate(routes):
+        summary, breakdown = compute_direct_route_info(route, idx + 1)
+        all_results.append({
+            "summary": summary,
+            "step_breakdown": breakdown
+        })
+    return jsonify(all_results)
 
-    search([], set(), 0, 0, 0, [])
-    results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
-    return results
-
-# ---------- MANUAL (JSON OUTPUT) ----------
 @app.route("/manual", methods=["POST"])
 def handle_manual_routes():
     data = request.json
@@ -330,7 +469,7 @@ def handle_manual_routes():
                 "dropoff": dropoff,
                 "revenue": load["revenue"],
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
-                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 1)),
+                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
                 "reload_options": reload_options,
                 "required": load.get("required", False),
@@ -342,108 +481,40 @@ def handle_manual_routes():
         }
 
         routes = enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65)
-        return jsonify({"routes": routes})
+
+        # For each summary route, expand to breakdown like direct
+        expanded = []
+        for idx, route in enumerate(routes):
+            # Create a dummy trip for compute_direct_route_info
+            trip_loads = []
+            for lid in route["load_ids"]:
+                # find load by id
+                found = next((l for l in result if l["load_id"] == lid), None)
+                if found:
+                    trip_loads.append({
+                        "pickupCity": found["pickup"],
+                        "dropoffCity": found["dropoff"],
+                        "rate": 0,  # real value if needed
+                        "weight": 0  # real value if needed
+                    })
+            trip_route = {"start": start, "end": end, "loads": trip_loads}
+            summary, step_breakdown = compute_direct_route_info(trip_route)
+            route["step_breakdown"] = step_breakdown
+            route["summary"] = summary
+            expanded.append(route)
+
+        return jsonify(expanded)
 
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
-# ---------- DIRECT ROUTE MULTI (JSON OUTPUT) ----------
-@app.route("/direct_route_multi", methods=["POST"])
-def direct_route_multi():
-    data = request.json
-    routes = data.get("routes", [])
-    if not routes:
-        return jsonify({"error": "No routes provided."}), 400
-
-    city_pairs = set()
-    for route in routes:
-        start = normalize_city(route.get("start", ""))
-        end = normalize_city(route.get("end", ""))
-        loads = route.get("loads", [])
-        if loads:
-            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
-            for load in loads:
-                pickup = normalize_city(load["pickupCity"])
-                dropoff = normalize_city(load["dropoffCity"])
-                city_pairs.add((pickup, dropoff))
-            for i in range(len(loads) - 1):
-                prev_drop = normalize_city(loads[i]["dropoffCity"])
-                next_pickup = normalize_city(loads[i+1]["pickupCity"])
-                city_pairs.add((prev_drop, next_pickup))
-            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
-
-    origin_dest_map = defaultdict(set)
-    for origin, dest in city_pairs:
-        origin_dest_map[origin].add(dest)
-    for origin, dests in origin_dest_map.items():
-        get_distances_batch(origin, list(dests))
-
-    all_results = []
-    for idx, route in enumerate(routes):
-        info = compute_direct_route_info_dict(route, idx + 1)
-        all_results.append(info)
-
-    return jsonify({"routes": all_results})
-
-def compute_direct_route_info_dict(route, route_num=1):
-    start = normalize_city(route.get("start", ""))
-    end = normalize_city(route.get("end", ""))
-    loads = route.get("loads", [])
-
-    loaded_km = 0.0
-    empty_km = 0.0
-    total_revenue = 0.0
-    num_loaded_legs = 0
-
-    if loads:
-        first_pickup = normalize_city(loads[0]["pickupCity"])
-        empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
-        empty_km += empty_to_first
-        for i, load in enumerate(loads):
-            pickup = normalize_city(load["pickupCity"])
-            dropoff = normalize_city(load["dropoffCity"])
-            rate = float(load.get("rate", 0))
-            weight = float(load.get("weight", 0))
-            revenue = rate * weight
-            dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
-            loaded_km += dist
-            total_revenue += revenue
-            num_loaded_legs += 1
-            if i < len(loads) - 1:
-                next_pickup = normalize_city(loads[i+1]["pickupCity"])
-                deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
-                empty_km += deadhead
-        last_drop = normalize_city(loads[-1]["dropoffCity"])
-        empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
-        empty_km += empty_back
-
-    total_km = loaded_km + empty_km
-    loaded_pct = (loaded_km / total_km * 100) if total_km else 0
-    total_miles = total_km * 0.621371
-    rpm = (total_revenue / total_miles) if total_miles else 0
-
-    driving_hours = total_km / 85 if total_km else 0
-    total_hours = driving_hours + 2 * num_loaded_legs
-    hourly_rate = (total_revenue / total_hours) if total_hours else 0
-
-    return {
-        "route_num": route_num,
-        "start": start,
-        "end": end,
-        "loaded_km": round(loaded_km, 1),
-        "empty_km": round(empty_km, 1),
-        "total_km": round(total_km, 1),
-        "loaded_pct": round(loaded_pct, 1),
-        "total_revenue": round(total_revenue, 2),
-        "rpm": round(rpm, 2),
-        "hourly_rate": round(hourly_rate, 2)
-    }
-
-# ---------- STATIC DISPATCH FORM ----------
 @app.route("/")
 def show_dispatch_form():
-    return render_template("dispatch_form.html")
+    return render_template_string("""
+    <h1>Dispatchy Backend Running!</h1>
+    <p>Use your frontend to interact with endpoints.</p>
+    """)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

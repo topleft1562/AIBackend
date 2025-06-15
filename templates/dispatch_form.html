@@ -76,276 +76,315 @@
 
   <script>
     let routeCount = 0;
-    let currentRouteMode = "direct"; // Default to direct
-    let manualResultsCache = []; // Store manual results for sorting
+let currentRouteMode = "direct";
+let resultsCache = []; // Can hold manual or direct results
 
-    function addRouteBlock() {
-      routeCount += 1;
-      const routesContainer = document.getElementById('routesContainer');
-      const routeDiv = document.createElement('div');
-      routeDiv.className = "route-block";
-      routeDiv.dataset.routeIndex = routeCount;
-      routeDiv.innerHTML = `
-        <h3>Route ${routeCount} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button></h3>
-        <label>Start Location:</label>
-        <input type="text" name="start" placeholder="Starting Point" required />
-        <label>End Location:</label>
-        <input type="text" name="end" placeholder="Ending Point" required />
-        <div class="load-header"></div>
-        <div class="loadsContainer"></div>
-        <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
-      `;
-      routesContainer.appendChild(routeDiv);
-      renderLoadHeaderAndRows(routeDiv, true);
-      updateRouteUI();
+function addRouteBlock() {
+  routeCount += 1;
+  const routesContainer = document.getElementById('routesContainer');
+  const routeDiv = document.createElement('div');
+  routeDiv.className = "route-block";
+  routeDiv.dataset.routeIndex = routeCount;
+  routeDiv.innerHTML = `
+    <h3>Route ${routeCount} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button></h3>
+    <label>Start Location:</label>
+    <input type="text" name="start" placeholder="Starting Point" required />
+    <label>End Location:</label>
+    <input type="text" name="end" placeholder="Ending Point" required />
+    <div class="load-header"></div>
+    <div class="loadsContainer"></div>
+    <button type="button" onclick="addLoadRow(this)">➕ Add Load</button>
+  `;
+  routesContainer.appendChild(routeDiv);
+  renderLoadHeaderAndRows(routeDiv, true);
+  updateRouteUI();
+}
+
+function removeRouteBlock(btn) {
+  btn.closest('.route-block').remove();
+  updateRouteNumbers();
+  updateRouteUI();
+}
+
+function addLoadRow(routeBtn) {
+  const routeDiv = routeBtn.closest('.route-block');
+  const loadsContainer = routeDiv.querySelector('.loadsContainer');
+  addLoadRowWithValues(loadsContainer, {
+    pickup: "",
+    dropoff: "",
+    rate: "0",
+    weight: "43",
+    required: false,
+    count: "1"
+  });
+}
+
+function addLoadRowWithValues(loadsContainer, values) {
+  const mode = currentRouteMode;
+  const row = document.createElement('div');
+  row.className = "load-row";
+  row.innerHTML = `
+    <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
+    ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
+    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
+    <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
+    ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
+    <button type="button" onclick="removeLoadRow(this)">❌</button>
+  `;
+  loadsContainer.appendChild(row);
+}
+
+function removeLoadRow(btn) {
+  btn.parentElement.remove();
+}
+
+function updateRouteNumbers() {
+  const blocks = document.querySelectorAll('.route-block');
+  blocks.forEach((block, i) => {
+    const h3 = block.querySelector('h3');
+    h3.innerHTML = `Route ${i + 1} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>`;
+    block.dataset.routeIndex = i + 1;
+  });
+  routeCount = blocks.length;
+}
+
+function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
+  const header = routeDiv.querySelector('.load-header');
+  if (!header) return;
+  let headerHtml = `
+    <span>Pickup</span>
+    <span>Dropoff</span>
+    ${currentRouteMode === "best" ? "<span># of Loads</span>" : ""}
+    <span>Rate ($/MT)</span>
+    <span>Weight (MT)</span>
+    ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}
+    <span></span>
+  `;
+  header.innerHTML = headerHtml;
+  const loadsContainer = routeDiv.querySelector('.loadsContainer');
+  const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
+  const oldVals = rows.map(row => ({
+    pickup: row.querySelector("input[name='pickup']").value,
+    dropoff: row.querySelector("input[name='dropoff']").value,
+    rate: row.querySelector("input[name='rate']").value,
+    weight: row.querySelector("input[name='weight']").value,
+    required: false,
+    count: row.querySelector("input[name='count']") ? row.querySelector("input[name='count']").value : "1"
+  }));
+  loadsContainer.innerHTML = "";
+  oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
+  if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
+}
+
+function updateRouteUI() {
+  const addRouteBtn = document.getElementById("addRouteBtn");
+  const routesContainer = document.getElementById("routesContainer");
+  const blocks = document.querySelectorAll('.route-block');
+  blocks.forEach(block => renderLoadHeaderAndRows(block, true));
+  blocks.forEach(block => {
+    const startInput = block.querySelector("input[name='start']");
+    const endInput = block.querySelector("input[name='end']");
+    if (currentRouteMode === "direct") {
+      startInput.removeAttribute("required");
+      endInput.removeAttribute("required");
+    } else {
+      startInput.setAttribute("required", "required");
+      endInput.setAttribute("required", "required");
     }
-
-    function removeRouteBlock(btn) {
-      btn.closest('.route-block').remove();
-      updateRouteNumbers();
-      updateRouteUI();
+  });
+  if (currentRouteMode === "direct") {
+    addRouteBtn.style.display = "inline-block";
+    const removeBtns = document.querySelectorAll('.remove-route-btn');
+    removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "inline" : "none"));
+  } else {
+    addRouteBtn.style.display = "none";
+    while (routesContainer.children.length > 1) {
+      routesContainer.removeChild(routesContainer.lastChild);
     }
+    routeCount = 1;
+    updateRouteNumbers();
+    const removeBtns = document.querySelectorAll('.remove-route-btn');
+    removeBtns.forEach(btn => btn.style.display = "none");
+  }
+  document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
+}
 
-    function addLoadRow(routeBtn) {
-      const routeDiv = routeBtn.closest('.route-block');
-      const loadsContainer = routeDiv.querySelector('.loadsContainer');
-      addLoadRowWithValues(loadsContainer, {
-        pickup: "",
-        dropoff: "",
-        rate: "0",
-        weight: "43",
-        required: false,
-        count: "1"
-      });
-    }
-
-    function addLoadRowWithValues(loadsContainer, values) {
-      const mode = currentRouteMode;
-      const row = document.createElement('div');
-      row.className = "load-row";
-      row.innerHTML = `
-        <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
-        <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
-        ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
-        <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
-        <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
-        ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
-        <button type="button" onclick="removeLoadRow(this)">❌</button>
-      `;
-      loadsContainer.appendChild(row);
-    }
-
-    function removeLoadRow(btn) {
-      btn.parentElement.remove();
-    }
-
-    function updateRouteNumbers() {
-      const blocks = document.querySelectorAll('.route-block');
-      blocks.forEach((block, i) => {
-        const h3 = block.querySelector('h3');
-        h3.innerHTML = `Route ${i + 1} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>`;
-        block.dataset.routeIndex = i + 1;
-      });
-      routeCount = blocks.length;
-    }
-
-    function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
-      // Update header for current mode
-      const header = routeDiv.querySelector('.load-header');
-      if (!header) return;
-      let headerHtml = `
-        <span>Pickup</span>
-        <span>Dropoff</span>
-        ${currentRouteMode === "best" ? "<span># of Loads</span>" : ""}
-        <span>Rate ($/MT)</span>
-        <span>Weight (MT)</span>
-        ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}
-        <span></span>
-      `;
-      header.innerHTML = headerHtml;
-      // Update each row in loadsContainer to match current mode (preserve values, but always reset required on mode switch)
-      const loadsContainer = routeDiv.querySelector('.loadsContainer');
-      const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
-      const oldVals = rows.map(row => ({
-        pickup: row.querySelector("input[name='pickup']").value,
-        dropoff: row.querySelector("input[name='dropoff']").value,
-        rate: row.querySelector("input[name='rate']").value,
-        weight: row.querySelector("input[name='weight']").value,
-        required: false,
-        count: row.querySelector("input[name='count']") ? row.querySelector("input[name='count']").value : "1"
-      }));
-      loadsContainer.innerHTML = "";
-      oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
-      if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
-    }
-
-    function updateRouteUI() {
-      const addRouteBtn = document.getElementById("addRouteBtn");
-      const routesContainer = document.getElementById("routesContainer");
-      const blocks = document.querySelectorAll('.route-block');
-      blocks.forEach(block => renderLoadHeaderAndRows(block, true));
-      blocks.forEach(block => {
-        const startInput = block.querySelector("input[name='start']");
-        const endInput = block.querySelector("input[name='end']");
-        if (currentRouteMode === "direct") {
-          startInput.removeAttribute("required");
-          endInput.removeAttribute("required");
-        } else {
-          startInput.setAttribute("required", "required");
-          endInput.setAttribute("required", "required");
-        }
-      });
-      if (currentRouteMode === "direct") {
-        addRouteBtn.style.display = "inline-block";
-        const removeBtns = document.querySelectorAll('.remove-route-btn');
-        removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "inline" : "none"));
-      } else {
-        addRouteBtn.style.display = "none";
-        while (routesContainer.children.length > 1) {
-          routesContainer.removeChild(routesContainer.lastChild);
-        }
-        routeCount = 1;
-        updateRouteNumbers();
-        const removeBtns = document.querySelectorAll('.remove-route-btn');
-        removeBtns.forEach(btn => btn.style.display = "none");
+// --- SUBMIT HANDLER ---
+document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  document.getElementById("output").innerHTML = "";
+  document.getElementById("spinner").style.display = "block";
+  resultsCache = [];
+  // Collect route blocks
+  const routeBlocks = document.querySelectorAll('.route-block');
+  let dataToSend = [];
+  for (const routeDiv of routeBlocks) {
+    const pickups = routeDiv.querySelectorAll("input[name='pickup']");
+    const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
+    let start = routeDiv.querySelector("input[name='start']").value.trim();
+    let end = routeDiv.querySelector("input[name='end']").value.trim();
+    const counts = routeDiv.querySelectorAll("input[name='count']");
+    const rates = routeDiv.querySelectorAll("input[name='rate']");
+    const weights = routeDiv.querySelectorAll("input[name='weight']");
+    const requireds = routeDiv.querySelectorAll("input[name='required']");
+    const isManualMode = (currentRouteMode === "manual");
+    const isBestMode = (currentRouteMode === "best");
+    const loads = [];
+    for (let i = 0; i < pickups.length; i++) {
+      const pickup = pickups[i].value.trim();
+      const dropoff = dropoffs[i].value.trim();
+      const count = isBestMode ? parseInt(counts[i].value) : 1;
+      const rate = parseFloat(rates[i].value);
+      const weight = parseFloat(weights[i].value);
+      const required = isManualMode && requireds[i] ? requireds[i].checked : false;
+      for (let j = 0; j < count; j++) {
+        loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required });
       }
-      // Show/hide sort toggle for manual mode
-      document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
     }
-
-    // -- MAIN SUBMIT HANDLER --
-    document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      document.getElementById("output").innerHTML = "";
-      document.getElementById("spinner").style.display = "block";
-      manualResultsCache = [];
-
-      // Collect all route blocks
-      const routeBlocks = document.querySelectorAll('.route-block');
-      let dataToSend = [];
-
-      for (const routeDiv of routeBlocks) {
-        const pickups = routeDiv.querySelectorAll("input[name='pickup']");
-        const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
-        let start = routeDiv.querySelector("input[name='start']").value.trim();
-        let end = routeDiv.querySelector("input[name='end']").value.trim();
-        const counts = routeDiv.querySelectorAll("input[name='count']");
-        const rates = routeDiv.querySelectorAll("input[name='rate']");
-        const weights = routeDiv.querySelectorAll("input[name='weight']");
-        const requireds = routeDiv.querySelectorAll("input[name='required']");
-        const isManualMode = (currentRouteMode === "manual");
-        const isBestMode = (currentRouteMode === "best");
-        const loads = [];
-        for (let i = 0; i < pickups.length; i++) {
-          const pickup = pickups[i].value.trim();
-          const dropoff = dropoffs[i].value.trim();
-          const count = isBestMode ? parseInt(counts[i].value) : 1;
-          const rate = parseFloat(rates[i].value);
-          const weight = parseFloat(weights[i].value);
-          const required = isManualMode && requireds[i] ? requireds[i].checked : false;
-          for (let j = 0; j < count; j++) {
-            loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required });
-          }
-        }
-        if (currentRouteMode === "direct") {
-          if (!start && loads.length) {
-            start = loads[0].pickupCity || "";
-          }
-          if (!end && loads.length) {
-            end = loads[loads.length - 1].dropoffCity || "";
-          }
-        }
-        dataToSend.push({ start, end, loads });
+    if (currentRouteMode === "direct") {
+      if (!start && loads.length) {
+        start = loads[0].pickupCity || "";
       }
-
-      try {
-        let endpoint, payload;
-        if (currentRouteMode === "manual") {
-          endpoint = "/manual";
-          payload = { ...dataToSend[0] };
-        } else if (currentRouteMode === "direct") {
-          endpoint = "/direct_route_multi";
-          payload = { routes: dataToSend };
-        } else {
-          endpoint = "/dispatch";
-          payload = { ...dataToSend[0] };
-        }
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        // -- HANDLE RESPONSE --
-        if (currentRouteMode === "manual" || currentRouteMode === "direct") {
-          const data = await response.json();
-          if (data.error) throw new Error(data.error);
-          manualResultsCache = data.routes;
-          renderResultsTable(manualResultsCache);
-        } else {
-          // For AI mode, just render the HTML directly
-          const html = await response.text();
-          document.getElementById("output").innerHTML = html;
-        }
-      } catch (err) {
-        document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
-      } finally {
-        document.getElementById("spinner").style.display = "none";
+      if (!end && loads.length) {
+        end = loads[loads.length - 1].dropoffCity || "";
       }
+    }
+    dataToSend.push({ start, end, loads });
+  }
+
+  try {
+    let endpoint, payload;
+    if (currentRouteMode === "manual") {
+      endpoint = "/manual";
+      payload = { ...dataToSend[0] };
+    } else if (currentRouteMode === "direct") {
+      endpoint = "/direct_route_multi";
+      payload = { routes: dataToSend };
+    } else {
+      endpoint = "/dispatch";
+      payload = { ...dataToSend[0] };
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
-
-    // -- SORT TOGGLE FOR MANUAL MODE --
-    document.getElementById("sortToggle").addEventListener("change", function() {
-      if (manualResultsCache.length) renderResultsTable(manualResultsCache);
-    });
-
-    function renderResultsTable(routes) {
-      if (!routes.length) {
-        document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
-        return;
-      }
-      let sortBy = document.getElementById("sortToggle").value;
-      let sorted = [...routes].sort((a, b) => {
-        if (sortBy === "loaded_pct") return b.loaded_pct - a.loaded_pct;
-        if (sortBy === "rpm") return b.rpm - a.rpm;
-        return 0;
-      });
-      let ths = `<tr>
-        <th>City Sequence</th>
-        <th>Load IDs</th>
-        <th>Loaded km</th>
-        <th>Empty km</th>
-        <th>Loaded %</th>
-        <th>Total km</th>
-        <th>Revenue</th>
-        <th>RPM ($/mile)</th>
-      </tr>`;
-      let trs = sorted.map(r =>
-        `<tr>
-          <td>${r.city_sequence || ""}</td>
-          <td>${Array.isArray(r.load_ids) ? r.load_ids.join(", ") : ""}</td>
-          <td>${r.loaded_km}</td>
-          <td>${r.empty_km}</td>
-          <td>${r.loaded_pct}%</td>
-          <td>${r.total_km}</td>
-          <td>${r.revenue}</td>
-          <td>${r.rpm}</td>
-        </tr>`
-      ).join("");
-      document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
+    if (currentRouteMode === "manual" || currentRouteMode === "direct") {
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      // direct returns array, manual returns array
+      resultsCache = Array.isArray(data) ? data : data.routes;
+      renderResultsTable(resultsCache);
+    } else {
+      const html = await response.text();
+      document.getElementById("output").innerHTML = html;
     }
+  } catch (err) {
+    document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
+  } finally {
+    document.getElementById("spinner").style.display = "none";
+  }
+});
 
-    // Set up everything on page load
-    window.onload = function() {
-      addRouteBlock(); // Always start with one
-      document.getElementById("routeMode").value = "direct";
-      updateRouteUI();
-      document.getElementById('routeMode').addEventListener('change', function() {
-        currentRouteMode = this.value;
-        updateRouteUI();
-        document.getElementById("output").innerHTML = "";
-      });
-    };
+// --- SORT TOGGLE FOR MANUAL MODE ---
+document.getElementById("sortToggle").addEventListener("change", function () {
+  if (resultsCache.length) renderResultsTable(resultsCache);
+});
+
+function renderResultsTable(routes) {
+  if (!routes.length) {
+    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
+    return;
+  }
+  let sortBy = document.getElementById("sortToggle").value;
+  let sorted = [...routes].sort((a, b) => {
+    // Use "summary" if available (direct/manual now both have it)
+    let aMetric = a.summary ? a.summary[sortBy] : a[sortBy];
+    let bMetric = b.summary ? b.summary[sortBy] : b[sortBy];
+    return bMetric - aMetric;
+  });
+  let ths = `<tr>
+    <th>City Sequence</th>
+    <th>Load IDs</th>
+    <th>Loaded km</th>
+    <th>Empty km</th>
+    <th>Loaded %</th>
+    <th>Total km</th>
+    <th>Revenue</th>
+    <th>RPM ($/mile)</th>
+    <th>Details</th>
+  </tr>`;
+  let trs = sorted.map((r, i) => {
+    // Use summary if present (direct/manual unified)
+    let summary = r.summary || r;
+    let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
+    let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
+    let expandedId = `expando${i}`;
+    return `<tr>
+      <td>${citySeq}</td>
+      <td>${loadIds}</td>
+      <td>${summary.loaded_km}</td>
+      <td>${summary.empty_km}</td>
+      <td>${summary.loaded_pct}%</td>
+      <td>${summary.total_km}</td>
+      <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
+      <td>${summary.rpm}</td>
+      <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
+    </tr>
+    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown)}</td></tr>`;
+  }).join("");
+  document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
+}
+
+// Renders step breakdown table (passed an array of breakdown steps)
+function renderBreakdownTable(steps) {
+  if (!steps || !steps.length) return "<div>No breakdown available.</div>";
+  let th = `<tr>
+    <th>Step Type</th>
+    <th>Segment</th>
+    <th>KMs</th>
+    <th>Rate</th>
+    <th>Weight</th>
+    <th>Revenue</th>
+    <th>RPM ($/mile)</th>
+  </tr>`;
+  let rows = steps.map(s =>
+    `<tr>
+      <td>${capitalize(s.type)}</td>
+      <td>${s.segment}</td>
+      <td>${s.kms}</td>
+      <td>${s.rate}</td>
+      <td>${s.weight}</td>
+      <td>${s.revenue}</td>
+      <td>${s.rpm}</td>
+    </tr>`
+  ).join("");
+  return `<table class="results-table" style="margin:8px 0">${th}${rows}</table>`;
+}
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+}
+
+// Details toggle for expansion/collapse
+window.toggleDetails = function (id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.style.display = (row.style.display === "none") ? "" : "none";
+};
+
+// On load
+window.onload = function () {
+  addRouteBlock();
+  document.getElementById("routeMode").value = "direct";
+  updateRouteUI();
+  document.getElementById('routeMode').addEventListener('change', function () {
+    currentRouteMode = this.value;
+    updateRouteUI();
+    document.getElementById("output").innerHTML = "";
+  });
+};
+
   </script>
 </body>
 </html>
