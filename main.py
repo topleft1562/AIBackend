@@ -531,7 +531,7 @@ def handle_manual_routes():
 
 @app.route("/")
 def show_dispatch_form():
-    return render_template("dispatch_form.html")
+    return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
