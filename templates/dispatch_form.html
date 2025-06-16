@@ -332,14 +332,28 @@ document.getElementById("sortToggle").addEventListener("change", function () {
   if (resultsCache.length) renderResultsTable(resultsCache);
 });
 
-// Google Map Plotting
-function plotGoogleRouteMap(steps, mapId) {
+function getOrderedCitiesFromSteps(steps) {
   let cities = [];
   steps.forEach(s => {
     let seg = s.segment.replace(/<[^>]+>/g, '');
     let parts = seg.split('→').map(x => x.trim());
-    parts.forEach(p => { if (p && !cities.includes(p)) cities.push(p); });
+    parts.forEach(p => {
+      // Always include last city even if same as first
+      if (!cities.length || p !== cities[cities.length-1] || p === parts[parts.length-1]) {
+        cities.push(p);
+      }
+    });
   });
+  // Ensure last city from last segment is included
+  if (cities[cities.length-1] !== steps[steps.length-1].segment.split('→').pop().trim()) {
+    cities.push(steps[steps.length-1].segment.split('→').pop().trim());
+  }
+  return cities;
+}
+
+// Google Map Plotting
+function plotGoogleRouteMap(steps, mapId) {
+  let cities = getOrderedCitiesFromSteps(steps);
   if (cities.length < 2) return;
   loadGoogleMapsApi(() => {
     const map = new google.maps.Map(document.getElementById(mapId), {
