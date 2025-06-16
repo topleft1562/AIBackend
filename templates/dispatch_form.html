@@ -30,10 +30,7 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
-  <!-- Add Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <!-- Add Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Dynamically loaded Google Maps API in JS below -->
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
@@ -92,10 +89,32 @@
   <div id="output" style="margin-top:30px;"></div>
 
 <script>
+const GOOGLE_API_KEY = "{{ google_api_key }}";
+let googleMapsLoaded = false;
+function loadGoogleMapsApi(callback) {
+  if (window.google && window.google.maps) {
+    callback();
+    return;
+  }
+  if (document.getElementById('googleMapsScript')) {
+    document.getElementById('googleMapsScript').addEventListener('load', callback);
+    return;
+  }
+  const script = document.createElement('script');
+  script.id = 'googleMapsScript';
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&callback=onGoogleMapsLoaded`;
+  script.async = true;
+  script.defer = true;
+  window.onGoogleMapsLoaded = function () {
+    googleMapsLoaded = true;
+    callback();
+  };
+  document.head.appendChild(script);
+}
+
 let routeCount = 0;
 let currentRouteMode = "direct";
 let resultsCache = [];
-let stepBreakdownCache = {}; // Cache steps for map use
 
 function addRouteBlock() {
   routeCount += 1;
@@ -225,12 +244,9 @@ function updateRouteUI() {
     const removeBtns = document.querySelectorAll('.remove-route-btn');
     removeBtns.forEach(btn => btn.style.display = "none");
   }
-  // Show settings only in best/manual mode
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
-  // Show/hide sort toggle for manual mode
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 }
-
 
 // --- SUBMIT HANDLER ---
 document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
@@ -238,7 +254,6 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   document.getElementById("output").innerHTML = "";
   document.getElementById("spinner").style.display = "block";
   resultsCache = [];
-  stepBreakdownCache = {};
   // Collect route blocks
   const routeBlocks = document.querySelectorAll('.route-block');
   let dataToSend = [];
@@ -301,8 +316,6 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       resultsCache = Array.isArray(data) ? data : data.routes;
-      // Cache the step breakdowns by index
-      resultsCache.forEach((r, i) => stepBreakdownCache[`routeMap${i}`] = r.step_breakdown);
       renderResultsTable(resultsCache);
     } else {
       const html = await response.text();
@@ -315,39 +328,48 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   }
 });
 
-// --- SORT TOGGLE FOR MANUAL MODE ---
 document.getElementById("sortToggle").addEventListener("change", function () {
   if (resultsCache.length) renderResultsTable(resultsCache);
 });
 
-function renderRouteMap(steps, mapId) {
-  if (!document.getElementById(mapId)) return;
-  // Find all cities from steps
+// Google Map Plotting
+function plotGoogleRouteMap(steps, mapId) {
   let cities = [];
   steps.forEach(s => {
     let seg = s.segment.replace(/<[^>]+>/g, '');
     let parts = seg.split('→').map(x => x.trim());
     parts.forEach(p => { if (p && !cities.includes(p)) cities.push(p); });
   });
-  // Use Nominatim to get lat/lngs for all unique cities
-  Promise.all(cities.map(city =>
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`)
-      .then(res => res.json())
-      .then(res => res[0] ? [parseFloat(res[0].lat), parseFloat(res[0].lon)] : null)
-  )).then(coords => {
-    coords = coords.filter(Boolean);
-    if (!coords.length) return;
-    if (window[mapId]) { window[mapId].remove(); }
-    let map = L.map(mapId).setView(coords[0], 6);
-    window[mapId] = map;
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: 'Map data © OpenStreetMap contributors'
-    }).addTo(map);
-    coords.forEach((latlng, i) => {
-      L.marker(latlng).addTo(map).bindPopup(cities[i]);
+  if (cities.length < 2) return;
+  loadGoogleMapsApi(() => {
+    const map = new google.maps.Map(document.getElementById(mapId), {
+      zoom: 6,
+      center: { lat: 50, lng: -99 }
     });
-    L.polyline(coords, { color: 'blue', weight: 5, opacity: 0.6 }).addTo(map);
-    map.fitBounds(L.polyline(coords).getBounds(), { padding: [30, 30] });
+    const directionsService = new google.maps.DirectionsService();
+    const directionsRenderer = new google.maps.DirectionsRenderer({ map });
+    const [origin, ...rest] = cities;
+    const destination = rest.pop();
+    const waypoints = rest.map(city => ({ location: city, stopover: true }));
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      waypoints: waypoints,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result, status) => {
+      if (status === "OK") {
+        directionsRenderer.setDirections(result);
+      } else {
+        // fallback: just drop pins
+        cities.forEach(city => {
+          new google.maps.Geocoder().geocode({ address: city }, (res, stat) => {
+            if (stat === 'OK' && res[0]) {
+              new google.maps.Marker({ map, position: res[0].geometry.location, title: city });
+            }
+          });
+        });
+      }
+    });
   });
 }
 
@@ -387,7 +409,7 @@ function renderResultsTable(routes) {
       <td>${summary.total_km}</td>
       <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
       <td>${summary.rpm}</td>
-      <td><button onclick="toggleDetailsAndMap('${expandedId}', 'routeMap${i}')">Expand</button></td>
+      <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
     </tr>
     <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
   }).join("");
@@ -416,8 +438,9 @@ function renderBreakdownTable(steps, routeIdx = 0) {
       <td>${s.rpm}</td>
     </tr>`
   ).join("");
-  // Map container with unique ID
+  // --- Add map container (unique per details section)
   const mapId = `routeMap${routeIdx}`;
+  setTimeout(() => plotGoogleRouteMap(steps, mapId), 0);
   return `
     <table class="results-table" style="margin:8px 0">${th}${rows}</table>
     <div style="height:320px;margin:10px 0;border-radius:12px;overflow:hidden;">
@@ -426,25 +449,15 @@ function renderBreakdownTable(steps, routeIdx = 0) {
   `;
 }
 
-// --- EXPAND AND MAP HANDLING ---
-window.toggleDetailsAndMap = function(id, mapId) {
-  const row = document.getElementById(id);
-  if (!row) return;
-  const isOpen = (row.style.display === "");
-  row.style.display = isOpen ? "none" : "";
-  // Render the map only when expanding (not collapsing)
-  if (!isOpen) {
-    // Delay so container is visible
-    setTimeout(() => {
-      // Use cached steps
-      renderRouteMap(stepBreakdownCache[mapId], mapId);
-    }, 10);
-  }
-};
-
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
+
+window.toggleDetails = function (id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.style.display = (row.style.display === "none") ? "" : "none";
+};
 
 window.onload = function () {
   addRouteBlock();
