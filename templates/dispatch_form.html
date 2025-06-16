@@ -95,6 +95,7 @@
 let routeCount = 0;
 let currentRouteMode = "direct";
 let resultsCache = [];
+let stepBreakdownCache = {}; // Cache steps for map use
 
 function addRouteBlock() {
   routeCount += 1;
@@ -237,6 +238,7 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   document.getElementById("output").innerHTML = "";
   document.getElementById("spinner").style.display = "block";
   resultsCache = [];
+  stepBreakdownCache = {};
   // Collect route blocks
   const routeBlocks = document.querySelectorAll('.route-block');
   let dataToSend = [];
@@ -299,6 +301,8 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
       const data = await response.json();
       if (data.error) throw new Error(data.error);
       resultsCache = Array.isArray(data) ? data : data.routes;
+      // Cache the step breakdowns by index
+      resultsCache.forEach((r, i) => stepBreakdownCache[`routeMap${i}`] = r.step_breakdown);
       renderResultsTable(resultsCache);
     } else {
       const html = await response.text();
@@ -321,7 +325,7 @@ function renderRouteMap(steps, mapId) {
   // Find all cities from steps
   let cities = [];
   steps.forEach(s => {
-    let seg = s.segment.replace(/<[^>]+>/g, ''); // remove HTML tags
+    let seg = s.segment.replace(/<[^>]+>/g, '');
     let parts = seg.split('→').map(x => x.trim());
     parts.forEach(p => { if (p && !cities.includes(p)) cities.push(p); });
   });
@@ -333,14 +337,12 @@ function renderRouteMap(steps, mapId) {
   )).then(coords => {
     coords = coords.filter(Boolean);
     if (!coords.length) return;
-    // Remove previous map instance (if any)
     if (window[mapId]) { window[mapId].remove(); }
     let map = L.map(mapId).setView(coords[0], 6);
     window[mapId] = map;
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
     }).addTo(map);
-    // Add markers & line
     coords.forEach((latlng, i) => {
       L.marker(latlng).addTo(map).bindPopup(cities[i]);
     });
@@ -385,7 +387,7 @@ function renderResultsTable(routes) {
       <td>${summary.total_km}</td>
       <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
       <td>${summary.rpm}</td>
-      <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
+      <td><button onclick="toggleDetailsAndMap('${expandedId}', 'routeMap${i}')">Expand</button></td>
     </tr>
     <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
   }).join("");
@@ -414,11 +416,8 @@ function renderBreakdownTable(steps, routeIdx = 0) {
       <td>${s.rpm}</td>
     </tr>`
   ).join("");
-  
-  // --- Add map container (unique per details section)
+  // Map container with unique ID
   const mapId = `routeMap${routeIdx}`;
-  setTimeout(() => renderRouteMap(steps, mapId), 0); // render after DOM update
-
   return `
     <table class="results-table" style="margin:8px 0">${th}${rows}</table>
     <div style="height:320px;margin:10px 0;border-radius:12px;overflow:hidden;">
@@ -427,16 +426,25 @@ function renderBreakdownTable(steps, routeIdx = 0) {
   `;
 }
 
+// --- EXPAND AND MAP HANDLING ---
+window.toggleDetailsAndMap = function(id, mapId) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const isOpen = (row.style.display === "");
+  row.style.display = isOpen ? "none" : "";
+  // Render the map only when expanding (not collapsing)
+  if (!isOpen) {
+    // Delay so container is visible
+    setTimeout(() => {
+      // Use cached steps
+      renderRouteMap(stepBreakdownCache[mapId], mapId);
+    }, 10);
+  }
+};
 
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
-
-window.toggleDetails = function (id) {
-  const row = document.getElementById(id);
-  if (!row) return;
-  row.style.display = (row.style.display === "none") ? "" : "none";
-};
 
 window.onload = function () {
   addRouteBlock();
