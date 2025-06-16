@@ -26,6 +26,9 @@
     .results-table { border-collapse: collapse; width: 100%; margin: 18px 0; background: #fff; }
     .results-table th, .results-table td { border: 1px solid #bbb; padding: 6px 10px; text-align: center; }
     .results-table th { background: #f4f4f4; }
+    .settings-block { margin: 18px 0; }
+    .settings-block label { margin-right: 12px; display: inline-block; }
+    .settings-block input { margin-right: 18px; width: 60px; }
   </style>
 </head>
 <body>
@@ -37,6 +40,16 @@
       <option value="manual">Best Route (Manual)</option>
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
+    <div class="settings-block" id="extraSettings" style="display:none;">
+      <label>
+        Loaded % Goal:
+        <input type="number" id="loadedPctGoal" value="65" min="1" max="100" step="1" />
+      </label>
+      <label>
+        Max Chain Length:
+        <input type="number" id="maxChainLength" value="6" min="1" max="20" step="1" />
+      </label>
+    </div>
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
@@ -74,10 +87,10 @@
   </div>
   <div id="output" style="margin-top:30px;"></div>
 
-  <script>
-    let routeCount = 0;
+<script>
+let routeCount = 0;
 let currentRouteMode = "direct";
-let resultsCache = []; // Can hold manual or direct results
+let resultsCache = [];
 
 function addRouteBlock() {
   routeCount += 1;
@@ -207,6 +220,9 @@ function updateRouteUI() {
     const removeBtns = document.querySelectorAll('.remove-route-btn');
     removeBtns.forEach(btn => btn.style.display = "none");
   }
+  // Show settings only in best/manual mode
+  document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
+  // Show/hide sort toggle for manual mode
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 }
 
@@ -253,17 +269,21 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     dataToSend.push({ start, end, loads });
   }
 
+  // Get extra settings if relevant
+  let loadedPctGoal = Number(document.getElementById("loadedPctGoal")?.value || 65);
+  let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 6);
+
   try {
     let endpoint, payload;
     if (currentRouteMode === "manual") {
       endpoint = "/manual";
-      payload = { ...dataToSend[0] };
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
     } else if (currentRouteMode === "direct") {
       endpoint = "/direct_route_multi";
       payload = { routes: dataToSend };
     } else {
       endpoint = "/dispatch";
-      payload = { ...dataToSend[0] };
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
     }
     const response = await fetch(endpoint, {
       method: "POST",
@@ -273,7 +293,6 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     if (currentRouteMode === "manual" || currentRouteMode === "direct") {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      // direct returns array, manual returns array
       resultsCache = Array.isArray(data) ? data : data.routes;
       renderResultsTable(resultsCache);
     } else {
@@ -299,7 +318,6 @@ function renderResultsTable(routes) {
   }
   let sortBy = document.getElementById("sortToggle").value;
   let sorted = [...routes].sort((a, b) => {
-    // Use "summary" if available (direct/manual now both have it)
     let aMetric = a.summary ? a.summary[sortBy] : a[sortBy];
     let bMetric = b.summary ? b.summary[sortBy] : b[sortBy];
     return bMetric - aMetric;
@@ -316,7 +334,6 @@ function renderResultsTable(routes) {
     <th>Details</th>
   </tr>`;
   let trs = sorted.map((r, i) => {
-    // Use summary if present (direct/manual unified)
     let summary = r.summary || r;
     let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
     let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
@@ -337,7 +354,6 @@ function renderResultsTable(routes) {
   document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
 }
 
-// Renders step breakdown table (passed an array of breakdown steps)
 function renderBreakdownTable(steps) {
   if (!steps || !steps.length) return "<div>No breakdown available.</div>";
   let th = `<tr>
@@ -366,14 +382,12 @@ function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
 
-// Details toggle for expansion/collapse
 window.toggleDetails = function (id) {
   const row = document.getElementById(id);
   if (!row) return;
   row.style.display = (row.style.display === "none") ? "" : "none";
 };
 
-// On load
 window.onload = function () {
   addRouteBlock();
   document.getElementById("routeMode").value = "direct";
@@ -384,7 +398,6 @@ window.onload = function () {
     document.getElementById("output").innerHTML = "";
   });
 };
-
-  </script>
+</script>
 </body>
 </html>
