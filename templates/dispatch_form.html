@@ -30,6 +30,10 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
+  <!-- Add Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <!-- Add Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
@@ -226,6 +230,7 @@ function updateRouteUI() {
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 }
 
+
 // --- SUBMIT HANDLER ---
 document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
   e.preventDefault();
@@ -311,6 +316,39 @@ document.getElementById("sortToggle").addEventListener("change", function () {
   if (resultsCache.length) renderResultsTable(resultsCache);
 });
 
+function renderRouteMap(steps, mapId) {
+  if (!document.getElementById(mapId)) return;
+  // Find all cities from steps
+  let cities = [];
+  steps.forEach(s => {
+    let seg = s.segment.replace(/<[^>]+>/g, ''); // remove HTML tags
+    let parts = seg.split('→').map(x => x.trim());
+    parts.forEach(p => { if (p && !cities.includes(p)) cities.push(p); });
+  });
+  // Use Nominatim to get lat/lngs for all unique cities
+  Promise.all(cities.map(city =>
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}`)
+      .then(res => res.json())
+      .then(res => res[0] ? [parseFloat(res[0].lat), parseFloat(res[0].lon)] : null)
+  )).then(coords => {
+    coords = coords.filter(Boolean);
+    if (!coords.length) return;
+    // Remove previous map instance (if any)
+    if (window[mapId]) { window[mapId].remove(); }
+    let map = L.map(mapId).setView(coords[0], 6);
+    window[mapId] = map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
+    // Add markers & line
+    coords.forEach((latlng, i) => {
+      L.marker(latlng).addTo(map).bindPopup(cities[i]);
+    });
+    L.polyline(coords, { color: 'blue', weight: 5, opacity: 0.6 }).addTo(map);
+    map.fitBounds(L.polyline(coords).getBounds(), { padding: [30, 30] });
+  });
+}
+
 function renderResultsTable(routes) {
   if (!routes.length) {
     document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
@@ -349,12 +387,12 @@ function renderResultsTable(routes) {
       <td>${summary.rpm}</td>
       <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
     </tr>
-    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown)}</td></tr>`;
+    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
   }).join("");
   document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
 }
 
-function renderBreakdownTable(steps) {
+function renderBreakdownTable(steps, routeIdx = 0) {
   if (!steps || !steps.length) return "<div>No breakdown available.</div>";
   let th = `<tr>
     <th>Step Type</th>
@@ -376,8 +414,20 @@ function renderBreakdownTable(steps) {
       <td>${s.rpm}</td>
     </tr>`
   ).join("");
-  return `<table class="results-table" style="margin:8px 0">${th}${rows}</table>`;
+  
+  // --- Add map container (unique per details section)
+  const mapId = `routeMap${routeIdx}`;
+  setTimeout(() => renderRouteMap(steps, mapId), 0); // render after DOM update
+
+  return `
+    <table class="results-table" style="margin:8px 0">${th}${rows}</table>
+    <div style="height:320px;margin:10px 0;border-radius:12px;overflow:hidden;">
+      <div id="${mapId}" style="width:100%;height:100%;"></div>
+    </div>
+  `;
 }
+
+
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
