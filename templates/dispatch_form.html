@@ -420,82 +420,106 @@ function plotGoogleRouteMap(steps, mapId) {
 let driverCollapseId = idx => `driverCollapse${idx}`;
 let routeExpandId = (driverIdx, routeIdx) => `routeExpand${driverIdx}_${routeIdx}`;
 
-function renderResultsTable(routes, drivers = []) {
-  if (!drivers.length) {
-    const driverRows = document.querySelectorAll('.driver-row');
-    driverRows.forEach(row => {
-      const start = row.querySelector("input[name='driver_start']").value.trim();
-      const end = row.querySelector("input[name='driver_end']").value.trim();
-      if (start && end) drivers.push({ start, end });
+function renderResultsTable(routes) {
+  // Detect manual/multi-driver mode
+  if (Array.isArray(routes) && routes.length && routes[0].routes) {
+    // Grouped by driver (manual mode)
+    let out = '';
+    routes.forEach((driverEntry, dIdx) => {
+      const driver = driverEntry.driver || {};
+      const driverRoutes = driverEntry.routes || [];
+      const dCollapse = `driverCollapse${dIdx}`;
+      out += `
+        <div style="margin-bottom:28px;">
+          <h3 style="margin:6px 0;">
+            🚚 Driver ${dIdx + 1} <span style="font-weight:normal;font-size:15px;">(${driver.start} → ${driver.end})</span>
+            <button type="button" onclick="toggleCollapse('${dCollapse}')">Show/Hide Routes</button>
+          </h3>
+          <div id="${dCollapse}" style="display:none;">
+            <table class="results-table">
+              <tr>
+                <th>City Sequence</th>
+                <th>Load IDs</th>
+                <th>Loaded km</th>
+                <th>Empty km</th>
+                <th>Loaded %</th>
+                <th>Total km</th>
+                <th>Revenue</th>
+                <th>RPM ($/mile)</th>
+                <th>Details</th>
+              </tr>
+              ${driverRoutes.map((r, i) => {
+                let summary = r.summary || r;
+                let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
+                let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
+                let expandId = `routeExpand${dIdx}_${i}`;
+                return `
+                  <tr>
+                    <td>${citySeq}</td>
+                    <td>${loadIds}</td>
+                    <td>${summary.loaded_km}</td>
+                    <td>${summary.empty_km}</td>
+                    <td>${summary.loaded_pct}%</td>
+                    <td>${summary.total_km}</td>
+                    <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
+                    <td>${summary.rpm}</td>
+                    <td><button onclick="toggleDetails('${expandId}')">Expand</button></td>
+                  </tr>
+                  <tr id="${expandId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, `${dIdx}_${i}`)}</td></tr>
+                `;
+              }).join("")}
+            </table>
+          </div>
+        </div>
+      `;
     });
-  }
-  if (!routes.length || !drivers.length) {
-    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found.</div>";
+    document.getElementById("output").innerHTML = out;
     return;
   }
 
-  let grouped = drivers.map(() => []);
-  if (!routes[0].driver_idx && drivers.length > 1) {
-    let chunk = Math.ceil(routes.length / drivers.length);
-    for (let i = 0; i < routes.length; i++) {
-      grouped[Math.floor(i / chunk)].push(routes[i]);
-    }
-  } else {
-    routes.forEach(r => grouped[r.driver_idx || 0].push(r));
+  // Flat results (direct/AI)
+  if (!routes.length) {
+    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
+    return;
   }
-
-  let out = '';
-  grouped.forEach((driverRoutes, dIdx) => {
-    if (!driverRoutes.length) return;
-    const driver = drivers[dIdx];
-    const dCollapse = driverCollapseId(dIdx);
-    out += `
-      <div style="margin-bottom:28px;">
-        <h3 style="margin:6px 0;">
-          🚚 Driver ${dIdx + 1} (${driver.start} → ${driver.end})
-          <button type="button" onclick="toggleCollapse('${dCollapse}')">Show/Hide Routes</button>
-        </h3>
-        <div id="${dCollapse}" style="display:none;">
-          <table class="results-table">
-            <tr>
-              <th>City Sequence</th>
-              <th>Load IDs</th>
-              <th>Loaded km</th>
-              <th>Empty km</th>
-              <th>Loaded %</th>
-              <th>Total km</th>
-              <th>Revenue</th>
-              <th>RPM ($/mile)</th>
-              <th>Details</th>
-            </tr>
-            ${driverRoutes.map((r, i) => {
-              let summary = r.summary || r;
-              let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
-              let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
-              let expandId = routeExpandId(dIdx, i);
-              return `
-                <tr>
-                  <td>${citySeq}</td>
-                  <td>${loadIds}</td>
-                  <td>${summary.loaded_km}</td>
-                  <td>${summary.empty_km}</td>
-                  <td>${summary.loaded_pct}%</td>
-                  <td>${summary.total_km}</td>
-                  <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
-                  <td>${summary.rpm}</td>
-                  <td><button onclick="toggleDetails('${expandId}')">Expand</button></td>
-                </tr>
-                <tr id="${expandId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, `${dIdx}_${i}`)}</td></tr>
-              `;
-            }).join("")}
-          </table>
-        </div>
-      </div>
-    `;
+  let sortBy = document.getElementById("sortToggle").value;
+  let sorted = [...routes].sort((a, b) => {
+    let aMetric = a.summary ? a.summary[sortBy] : a[sortBy];
+    let bMetric = b.summary ? b.summary[sortBy] : b[sortBy];
+    return bMetric - aMetric;
   });
-
-  document.getElementById("output").innerHTML = out;
+  let ths = `<tr>
+    <th>City Sequence</th>
+    <th>Load IDs</th>
+    <th>Loaded km</th>
+    <th>Empty km</th>
+    <th>Loaded %</th>
+    <th>Total km</th>
+    <th>Revenue</th>
+    <th>RPM ($/mile)</th>
+    <th>Details</th>
+  </tr>`;
+  let trs = sorted.map((r, i) => {
+    let summary = r.summary || r;
+    let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
+    let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
+    let expandId = `expando${i}`;
+    return `<tr>
+      <td>${citySeq}</td>
+      <td>${loadIds}</td>
+      <td>${summary.loaded_km}</td>
+      <td>${summary.empty_km}</td>
+      <td>${summary.loaded_pct}%</td>
+      <td>${summary.total_km}</td>
+      <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
+      <td>${summary.rpm}</td>
+      <td><button onclick="toggleDetails('${expandId}')">Expand</button></td>
+    </tr>
+    <tr id="${expandId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
+  }).join("");
+  document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
 }
+
 
 function renderBreakdownTable(steps, routeIdx = 0) {
   if (!steps || !steps.length) return "<div>No breakdown available.</div>";
