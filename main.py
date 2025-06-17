@@ -230,156 +230,145 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
 
 @app.route("/dispatch", methods=["POST"])
 def handle_dispatch():
-    # AI mode (HTML output)
+    """
+    Multi-driver, AI mode (JSON API).
+    - Accepts: { drivers: [{start, end}], loads: [], loaded_pct_goal, max_chain_amount }
+    - Returns: [{ driver: {...}, routes: [ {summary, step_breakdown}, ... ] }, ...]
+    """
     data = request.json
+    drivers = data.get("drivers", [])
     loads = data.get("loads", [])
-    start_location = data.get("start", "Brandon, MB")
-    end_location = data.get("end", "Brandon, MB")
     loaded_pct_goal = float(data.get("loaded_pct_goal", 65)) / 100
     max_chain_amount = int(data.get("max_chain_amount", 6))
+    TOP_N = 5  # Show top 5 routes per driver
 
-    if not loads:
-        return jsonify({"error": "Missing loads in request."}), 400
+    if not drivers or not loads:
+        return jsonify({"error": "Missing drivers or loads in request."}), 400
 
-    try:
-        start = normalize_city(start_location)
-        end = normalize_city(end_location)
+    # Prepare loads and distances (enrich once, use for all drivers)
+    for i, load in enumerate(loads):
+        load["load_id"] = i + 1
+        load["pickupCity"] = normalize_city(load["pickupCity"])
+        load["dropoffCity"] = normalize_city(load["dropoffCity"])
+        load["rate"] = float(load.get("rate", 0))
+        load["weight"] = float(load.get("weight", 0))
+        load["revenue"] = load["rate"] * load["weight"]
 
-        for i, load in enumerate(loads):
-            load["load_id"] = i + 1
-            load["pickupCity"] = normalize_city(load["pickupCity"])
-            load["dropoffCity"] = normalize_city(load["dropoffCity"])
-            load["rate"] = float(load.get("rate", 0))
-            load["weight"] = float(load.get("weight", 0))
-            load["revenue"] = load["rate"] * load["weight"]
+    # Build global distance cache (for all driver starts/ends)
+    city_pairs = set()
+    for driver in drivers:
+        start = normalize_city(driver.get("start", "Brandon, MB"))
+        end = normalize_city(driver.get("end", "Brandon, MB"))
+        if loads:
+            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
+            for load in loads:
+                pickup = normalize_city(load["pickupCity"])
+                dropoff = normalize_city(load["dropoffCity"])
+                city_pairs.add((pickup, dropoff))
+            for i in range(len(loads) - 1):
+                prev_drop = normalize_city(loads[i]["dropoffCity"])
+                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                city_pairs.add((prev_drop, next_pickup))
+            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
 
-        city_pairs = set()
-        for load in loads:
-            pickup = load["pickupCity"]
-            dropoff = load["dropoffCity"]
-            city_pairs.update({(start, pickup), (pickup, dropoff), (dropoff, end)})
-            for other in loads:
-                city_pairs.add((dropoff, other["pickupCity"]))
+    origin_dest_map = defaultdict(set)
+    for origin, dest in city_pairs:
+        origin_dest_map[origin].add(dest)
+    for origin, dests in origin_dest_map.items():
+        get_distances_batch(origin, list(dests))
 
-        origin_dest_map = defaultdict(set)
-        for origin, dest in city_pairs:
-            origin_dest_map[origin].add(dest)
-        for origin, dests in origin_dest_map.items():
-            get_distances_batch(origin, list(dests))
-
-        result = []
-        for load in loads:
-            pickup = load["pickupCity"]
-            dropoff = load["dropoffCity"]
-            reload_options = {
-                f"load_{other['load_id']}": {
-                    "pickup": other["pickupCity"],
-                    "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                    "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
-                }
-                for other in loads if other["load_id"] != load["load_id"]
+    # Add reload_options to all loads
+    enriched_loads = []
+    for load in loads:
+        pickup = load["pickupCity"]
+        dropoff = load["dropoffCity"]
+        reload_options = {
+            f"load_{other['load_id']}": {
+                "pickup": other["pickupCity"],
+                "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
             }
-            result.append({
-                "load_id": load["load_id"],
-                "pickup": pickup,
-                "dropoff": dropoff,
-                "revenue": load["revenue"],
-                "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
-                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
-                "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
-                "reload_options": reload_options,
-            })
+            for other in loads if other["load_id"] != load["load_id"]
+        }
+        enriched_loads.append({
+            **load,
+            "reload_options": reload_options
+        })
+
+    all_results = []
+
+    # For each driver, let the LLM suggest route orders (top N), then re-calculate actual metrics and breakdowns
+    for driver in drivers:
+        start = normalize_city(driver.get("start", "Brandon, MB"))
+        end = normalize_city(driver.get("end", "Brandon, MB"))
+
+        # Prepare payload for AI
         enriched_data = {
             "start_location": start,
             "end_location": end,
-            "loads": result
+            "loads": enriched_loads
         }
 
-        # Add extra info for LLM if you want (not required for this example)
-
+        # LLM prompt for this driver
         prompt = (
-            "You are Dispatchy, a logistics planning expert. "
-            "You are given load and distance data (`enriched_data`) describing possible freight loads, their cities, and the distances between all relevant points.\n"
+            "You are Dispatchy, a logistics optimization assistant. "
+            "Given the loads and all distances (see reload_options for empty kms between any two loads), "
+            "find and list the top 5 most efficient route orderings for this driver, where: \n"
+            f"- The route starts at: {start}\n"
+            f"- The route ends at: {end}\n"
+            f"- Each route is a unique sequence of one or more loads (no repeats).\n"
+            f"- Do not include any route with loaded % below {int(loaded_pct_goal*100)}%.\n"
+            f"- Do not chain more than {max_chain_amount} loads in a route.\n"
+            f"- Return for each route: a list of load_ids (in order).\n"
+            f"- Order the routes by highest loaded % and then revenue.\n"
+            f"- Output ONLY JSON as: "
+            "[ {\"load_ids\": [1,2,3], \"loaded_pct\": 83.5, \"revenue\": 4600.00}, ... ]\n"
+            f"- No explanations, no markdown—just a JSON array with a maximum of 5 entries.\n"
             "\n"
-            "Consider every possible sequence (order) of loads—do not limit to just one or two orders. For example, if there are three loads, test all possible chaining orders (such as 1-2-3, 1-3-2, 2-1-3, etc.)."
-            "Explicitly enumerate all possible orderings and include all qualifying routes."
-            "Your goal is to calculate EVERY possible valid route (any order, no repeats, all combinations some single loads to all chained together.) that:\n"
-            "- Starts at `start_location` and ends at `end_location`.\n"
-            "- For each route, calculates metrics as follows:\n"
-            "    1. **Empty km**: Sum the following:\n"
-            "       - The `deadhead_km` (distance from start_location to first load's pickup).\n"
-            "       - For each pair of consecutive loads in the route, add the `deadhead_to_this_pickup` from the previous load's `reload_options`, using the next load's load_id as key.\n"
-            "       - The `return_km` (distance from the last load's dropoff to end_location).\n"
-            "    2. **Loaded km**: Sum each load's `loaded_km` (pickup to dropoff).\n"
-            "    3. **Total km**: loaded km + empty km.\n"
-            "    4. **Loaded %**: loaded km / total km.\n"
-            "    5. **Revenue**: For each load, revenue = rate × weight; total revenue is sum of all loads in the route.\n"
-            "    6. **RPM ($/mile)**: total revenue / (total km × 0.621371).\n"
-            f"- Only list routes that are {int(loaded_pct_goal*100)}% loaded or higher.\n"
-            "- DO NOT include or list any routes where loaded % is less than this threshold. "
-            "- DO NOT explain, show, or mention any route below the threshold—only show those that qualify."
-            "- Important: Do NOT use revenue or RPM as a filter. They are for display only."
-            "- Always show all qualifying routes, even if revenue or RPM is zero."
-            "\n"
-            "**Important Calculation Recipe:**\n"
-            "For a route like: Load A → Load B → Load C:\n"
-            "- Empty km = deadhead_km (from load A) + deadhead_to_this_pickup (from reload option A for B) + deadhead_to_this_pickup (from reload option B for C) + return_km (from load C)\n"
-            "- Loaded km = loaded_km for A + B + C\n"
-            "\n"
-            "Present each qualifying route as an HTML table row, showing:\n"
-            "- For each route, show the sequence of city steps, color-coded as follows: "
-            "start points in <span style='color:green'>green</span>, "
-            "each pickup (loading) point in <span style='color:blue'>blue</span>, "
-            "each dropoff (unloading) point in <span style='color:red'>red</span>, "
-            "and any empty (deadhead) move to the end location also in <span style='color:red'>red</span>. "
-            "After the city sequence, show: load_ids (in order), total loaded km, total empty km, loaded %, total km, total revenue, and RPM ($/mile). "
-            "- Format ONLY as an HTML table (no markdown, no explanations).\n"
-            "\n"
-            "After the table, give HTML bullet-point suggestions on which city pairs (and in which direction) would make new chains more efficient if more loads were available.\n"
-            "\n"
-            "The data structure is as follows:\n"
-            "- start_location (string): Starting city.\n"
-            "- end_location (string): Ending city.\n"
-            "- loads (array): Each with:\n"
-            "  - load_id (int), pickup (string), dropoff (string), revenue (float), deadhead_km (float), loaded_km (float), return_km (float), reload_options (dict of next load_id: {'pickup', 'deadhead_to_this_pickup': empty kms to this pickup, 'loaded_km': loaded kms for this load})\n"
-            "\n"
-            "Here is the enriched_data:\n"
+            "Data follows:\n"
             f"{json.dumps(enriched_data, indent=2)}"
         )
 
+        # Call LLM and parse
         response = agent.chat(prompt)
-        html_output = response.response
+        try:
+            ai_routes = json.loads(response.response)
+        except Exception:
+            # fallback if LLM puts text or JSON in code block
+            import re
+            match = re.search(r"\[\s*{.*?}\s*\]", response.response, re.DOTALL)
+            if match:
+                ai_routes = json.loads(match.group(0))
+            else:
+                ai_routes = []
 
-        return render_template_string(f"""
-            <html>
-                <head>
-                    <style>
-                        table {{
-                            border-collapse: collapse;
-                            margin: 16px 0;
-                            font-size: 15px;
-                            width: 100%;
-                            background: #fff;
-                        }}
-                        th, td {{
-                            border: 1px solid #bbb;
-                            padding: 6px 10px;
-                            text-align: center;
-                        }}
-                        th {{
-                            background: #f4f4f4;
-                        }}
-                    </style>
-                </head>
-                <body>
-                    <h2>Dispatch Plan</h2>
-                    {html_output}
-                </body>
-            </html>
-        """)
+        # Now for each AI route, compute step_breakdown and summary
+        expanded_routes = []
+        for idx, ai_route in enumerate(ai_routes[:TOP_N]):
+            # Build route object as required by compute_direct_route_info
+            trip_loads = []
+            for lid in ai_route.get("load_ids", []):
+                found = next((l for l in enriched_loads if l["load_id"] == lid), None)
+                if found:
+                    trip_loads.append({
+                        "pickupCity": found["pickupCity"],
+                        "dropoffCity": found["dropoffCity"],
+                        "rate": found.get("rate", 0),
+                        "weight": found.get("weight", 0)
+                    })
+            trip_route = {"start": start, "end": end, "loads": trip_loads}
+            summary, step_breakdown = compute_direct_route_info(trip_route, idx + 1)
+            expanded_routes.append({
+                "summary": summary,
+                "step_breakdown": step_breakdown
+            })
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        all_results.append({
+            "driver": {"start": start, "end": end},
+            "routes": expanded_routes
+        })
+
+    return jsonify(all_results)
 
 
 @app.route("/direct_route_multi", methods=["POST"])
