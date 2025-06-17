@@ -381,62 +381,63 @@ def handle_dispatch():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/direct_route_multi", methods=["POST"])
 def direct_route_multi():
-    # Returns JSON list, one per trip
     data = request.json
-    routes = data.get("routes", [])
-    if not routes:
-        return jsonify({"error": "No routes provided."}), 400
-
-    city_pairs = set()
-    for route in routes:
-        start = normalize_city(route.get("start", ""))
-        end = normalize_city(route.get("end", ""))
-        loads = route.get("loads", [])
-        if loads:
-            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
-            for load in loads:
-                pickup = normalize_city(load["pickupCity"])
-                dropoff = normalize_city(load["dropoffCity"])
-                city_pairs.add((pickup, dropoff))
-            for i in range(len(loads) - 1):
-                prev_drop = normalize_city(loads[i]["dropoffCity"])
-                next_pickup = normalize_city(loads[i+1]["pickupCity"])
-                city_pairs.add((prev_drop, next_pickup))
-            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
-
-    origin_dest_map = defaultdict(set)
-    for origin, dest in city_pairs:
-        origin_dest_map[origin].add(dest)
-    for origin, dests in origin_dest_map.items():
-        get_distances_batch(origin, list(dests))
-
     all_results = []
-    for idx, route in enumerate(routes):
+
+    # Always expect drivers + loads, no legacy handling
+    drivers = data.get("drivers", [])
+    loads = data.get("loads", [])
+
+    if not drivers or not loads:
+        return jsonify({"error": "Missing drivers or loads in request."}), 400
+
+    for idx, driver in enumerate(drivers):
+        start = normalize_city(driver.get("start", "Brandon, MB"))
+        end = normalize_city(driver.get("end", "Brandon, MB"))
+        route = {
+            "start": start,
+            "end": end,
+            "loads": loads
+        }
         summary, breakdown = compute_direct_route_info(route, idx + 1)
+        # Structure as array of drivers, each with a routes array (for future flexibility)
         all_results.append({
-            "summary": summary,
-            "step_breakdown": breakdown
+            "driver": {"start": start, "end": end},
+            "routes": [
+                {
+                    "summary": summary,
+                    "step_breakdown": breakdown
+                }
+            ]
         })
     return jsonify(all_results)
+
+
 
 @app.route("/manual", methods=["POST"])
 def handle_manual_routes():
     data = request.json
+    drivers = data.get("drivers", [])
     loads = data.get("loads", [])
-    start_location = data.get("start", "Brandon, MB")
-    end_location = data.get("end", "Brandon, MB")
     loaded_pct_goal = float(data.get("loaded_pct_goal", 65)) / 100
     max_chain_amount = int(data.get("max_chain_amount", 6))
 
-    if not loads:
-        return jsonify({"error": "Missing loads in request."}), 400
+    if not drivers or not loads:
+        return jsonify({"error": "Missing drivers or loads in request."}), 400
 
-    try:
+    all_results = []
+
+    for driver in drivers:
+        start_location = driver.get("start", "Brandon, MB")
+        end_location = driver.get("end", "Brandon, MB")
+
         start = normalize_city(start_location)
         end = normalize_city(end_location)
 
+        # Prepare loads for this run (assign IDs only once at the top)
         for i, load in enumerate(loads):
             load["load_id"] = i + 1
             load["pickupCity"] = normalize_city(load["pickupCity"])
@@ -523,11 +524,13 @@ def handle_manual_routes():
             route["hourly_rate"] = summary["hourly_rate"]
             expanded.append(route)
 
-        return jsonify(expanded)
+        all_results.append({
+            "driver": {"start": start, "end": end},
+            "routes": expanded
+        })
 
-    except Exception as e:
-        import traceback
-        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+    return jsonify(all_results)
+
 
 @app.route("/")
 def show_dispatch_form():
