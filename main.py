@@ -380,68 +380,41 @@ def handle_dispatch():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
+
 
 @app.route("/direct_route_multi", methods=["POST"])
 def direct_route_multi():
     data = request.json
     all_results = []
 
-    # --- NEW MULTI-DRIVER HANDLING ---
-    if "drivers" in data and "loads" in data:
-        # If drivers + loads provided, expand into route objects for each driver
-        drivers = data.get("drivers", [])
-        loads = data.get("loads", [])
-        routes = [
-            {
-                "start": driver.get("start", "Brandon, MB"),
-                "end": driver.get("end", "Brandon, MB"),
-                "loads": loads
-            }
-            for driver in drivers
-        ]
-    else:
-        # Backward compatible (routes array)
-        routes = data.get("routes", [])
-        if not routes:
-            return jsonify({"error": "No routes provided."}), 400
+    # Always expect drivers + loads, no legacy handling
+    drivers = data.get("drivers", [])
+    loads = data.get("loads", [])
 
-    city_pairs = set()
-    for route in routes:
-        start = normalize_city(route.get("start", ""))
-        end = normalize_city(route.get("end", ""))
-        loads = route.get("loads", [])
-        if loads:
-            city_pairs.add((start, normalize_city(loads[0]["pickupCity"])))
-            for load in loads:
-                pickup = normalize_city(load["pickupCity"])
-                dropoff = normalize_city(load["dropoffCity"])
-                city_pairs.add((pickup, dropoff))
-            for i in range(len(loads) - 1):
-                prev_drop = normalize_city(loads[i]["dropoffCity"])
-                next_pickup = normalize_city(loads[i+1]["pickupCity"])
-                city_pairs.add((prev_drop, next_pickup))
-            city_pairs.add((normalize_city(loads[-1]["dropoffCity"]), end))
+    if not drivers or not loads:
+        return jsonify({"error": "Missing drivers or loads in request."}), 400
 
-    origin_dest_map = defaultdict(set)
-    for origin, dest in city_pairs:
-        origin_dest_map[origin].add(dest)
-    for origin, dests in origin_dest_map.items():
-        get_distances_batch(origin, list(dests))
-
-    # Now run the direct route logic for each route
-    for idx, route in enumerate(routes):
+    for idx, driver in enumerate(drivers):
+        start = normalize_city(driver.get("start", "Brandon, MB"))
+        end = normalize_city(driver.get("end", "Brandon, MB"))
+        route = {
+            "start": start,
+            "end": end,
+            "loads": loads
+        }
         summary, breakdown = compute_direct_route_info(route, idx + 1)
+        # Structure as array of drivers, each with a routes array (for future flexibility)
         all_results.append({
-            "driver": {
-                "start": route.get("start", ""),
-                "end": route.get("end", "")
-            },
-            "summary": summary,
-            "step_breakdown": breakdown
+            "driver": {"start": start, "end": end},
+            "routes": [
+                {
+                    "summary": summary,
+                    "step_breakdown": breakdown
+                }
+            ]
         })
-
     return jsonify(all_results)
+
 
 
 @app.route("/manual", methods=["POST"])
