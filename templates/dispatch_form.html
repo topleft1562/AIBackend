@@ -26,7 +26,11 @@
     .results-table { border-collapse: collapse; width: 100%; margin: 18px 0; background: #fff; }
     .results-table th, .results-table td { border: 1px solid #bbb; padding: 6px 10px; text-align: center; }
     .results-table th { background: #f4f4f4; }
+    .settings-block { margin: 18px 0; }
+    .settings-block label { margin-right: 12px; display: inline-block; }
+    .settings-block input { margin-right: 18px; width: 60px; }
   </style>
+  <!-- Dynamically loaded Google Maps API in JS below -->
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
@@ -37,6 +41,16 @@
       <option value="manual">Best Route (Manual)</option>
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
+    <div class="settings-block" id="extraSettings" style="display:none;">
+      <label>
+        Loaded % Goal:
+        <input type="number" id="loadedPctGoal" value="65" min="1" max="100" step="1" />
+      </label>
+      <label>
+        Max Chain Length:
+        <input type="number" id="maxChainLength" value="6" min="1" max="20" step="1" />
+      </label>
+    </div>
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
@@ -74,10 +88,33 @@
   </div>
   <div id="output" style="margin-top:30px;"></div>
 
-  <script>
-    let routeCount = 0;
+<script>
+const GOOGLE_API_KEY = "{{ google_api_key }}";
+let googleMapsLoaded = false;
+function loadGoogleMapsApi(callback) {
+  if (window.google && window.google.maps) {
+    callback();
+    return;
+  }
+  if (document.getElementById('googleMapsScript')) {
+    document.getElementById('googleMapsScript').addEventListener('load', callback);
+    return;
+  }
+  const script = document.createElement('script');
+  script.id = 'googleMapsScript';
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&callback=onGoogleMapsLoaded`;
+  script.async = true;
+  script.defer = true;
+  window.onGoogleMapsLoaded = function () {
+    googleMapsLoaded = true;
+    callback();
+  };
+  document.head.appendChild(script);
+}
+
+let routeCount = 0;
 let currentRouteMode = "direct";
-let resultsCache = []; // Can hold manual or direct results
+let resultsCache = [];
 
 function addRouteBlock() {
   routeCount += 1;
@@ -207,6 +244,7 @@ function updateRouteUI() {
     const removeBtns = document.querySelectorAll('.remove-route-btn');
     removeBtns.forEach(btn => btn.style.display = "none");
   }
+  document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 }
 
@@ -253,17 +291,21 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     dataToSend.push({ start, end, loads });
   }
 
+  // Get extra settings if relevant
+  let loadedPctGoal = Number(document.getElementById("loadedPctGoal")?.value || 65);
+  let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 6);
+
   try {
     let endpoint, payload;
     if (currentRouteMode === "manual") {
       endpoint = "/manual";
-      payload = { ...dataToSend[0] };
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
     } else if (currentRouteMode === "direct") {
       endpoint = "/direct_route_multi";
       payload = { routes: dataToSend };
     } else {
       endpoint = "/dispatch";
-      payload = { ...dataToSend[0] };
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
     }
     const response = await fetch(endpoint, {
       method: "POST",
@@ -273,7 +315,6 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     if (currentRouteMode === "manual" || currentRouteMode === "direct") {
       const data = await response.json();
       if (data.error) throw new Error(data.error);
-      // direct returns array, manual returns array
       resultsCache = Array.isArray(data) ? data : data.routes;
       renderResultsTable(resultsCache);
     } else {
@@ -287,10 +328,64 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   }
 });
 
-// --- SORT TOGGLE FOR MANUAL MODE ---
 document.getElementById("sortToggle").addEventListener("change", function () {
   if (resultsCache.length) renderResultsTable(resultsCache);
 });
+
+function getOrderedCitiesFromSteps(steps) {
+  let cities = [];
+  steps.forEach(s => {
+    let seg = s.segment.replace(/<[^>]+>/g, '');
+    let parts = seg.split('→').map(x => x.trim());
+    parts.forEach(p => {
+      // Always include last city even if same as first
+      if (!cities.length || p !== cities[cities.length-1] || p === parts[parts.length-1]) {
+        cities.push(p);
+      }
+    });
+  });
+  // Ensure last city from last segment is included
+  if (cities[cities.length-1] !== steps[steps.length-1].segment.split('→').pop().trim()) {
+    cities.push(steps[steps.length-1].segment.split('→').pop().trim());
+  }
+  return cities;
+}
+
+// Google Map Plotting
+function plotGoogleRouteMap(steps, mapId) {
+  let cities = getOrderedCitiesFromSteps(steps);
+  if (cities.length < 2) return;
+  loadGoogleMapsApi(() => {
+    const map = new google.maps.Map(document.getElementById(mapId), {
+      zoom: 6,
+      center: { lat: 50, lng: -99 }
+    });
+    const directionsService = new google.maps.DirectionsService();
+    const directionsRenderer = new google.maps.DirectionsRenderer({ map });
+    const [origin, ...rest] = cities;
+    const destination = rest.pop();
+    const waypoints = rest.map(city => ({ location: city, stopover: true }));
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      waypoints: waypoints,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result, status) => {
+      if (status === "OK") {
+        directionsRenderer.setDirections(result);
+      } else {
+        // fallback: just drop pins
+        cities.forEach(city => {
+          new google.maps.Geocoder().geocode({ address: city }, (res, stat) => {
+            if (stat === 'OK' && res[0]) {
+              new google.maps.Marker({ map, position: res[0].geometry.location, title: city });
+            }
+          });
+        });
+      }
+    });
+  });
+}
 
 function renderResultsTable(routes) {
   if (!routes.length) {
@@ -299,7 +394,6 @@ function renderResultsTable(routes) {
   }
   let sortBy = document.getElementById("sortToggle").value;
   let sorted = [...routes].sort((a, b) => {
-    // Use "summary" if available (direct/manual now both have it)
     let aMetric = a.summary ? a.summary[sortBy] : a[sortBy];
     let bMetric = b.summary ? b.summary[sortBy] : b[sortBy];
     return bMetric - aMetric;
@@ -316,7 +410,6 @@ function renderResultsTable(routes) {
     <th>Details</th>
   </tr>`;
   let trs = sorted.map((r, i) => {
-    // Use summary if present (direct/manual unified)
     let summary = r.summary || r;
     let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
     let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
@@ -332,13 +425,12 @@ function renderResultsTable(routes) {
       <td>${summary.rpm}</td>
       <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
     </tr>
-    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown)}</td></tr>`;
+    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
   }).join("");
   document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
 }
 
-// Renders step breakdown table (passed an array of breakdown steps)
-function renderBreakdownTable(steps) {
+function renderBreakdownTable(steps, routeIdx = 0) {
   if (!steps || !steps.length) return "<div>No breakdown available.</div>";
   let th = `<tr>
     <th>Step Type</th>
@@ -360,20 +452,27 @@ function renderBreakdownTable(steps) {
       <td>${s.rpm}</td>
     </tr>`
   ).join("");
-  return `<table class="results-table" style="margin:8px 0">${th}${rows}</table>`;
+  // --- Add map container (unique per details section)
+  const mapId = `routeMap${routeIdx}`;
+  setTimeout(() => plotGoogleRouteMap(steps, mapId), 0);
+  return `
+    <table class="results-table" style="margin:8px 0">${th}${rows}</table>
+    <div style="height:320px;margin:10px 0;border-radius:12px;overflow:hidden;">
+      <div id="${mapId}" style="width:100%;height:100%;"></div>
+    </div>
+  `;
 }
+
 function capitalize(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
 
-// Details toggle for expansion/collapse
 window.toggleDetails = function (id) {
   const row = document.getElementById(id);
   if (!row) return;
   row.style.display = (row.style.display === "none") ? "" : "none";
 };
 
-// On load
 window.onload = function () {
   addRouteBlock();
   document.getElementById("routeMode").value = "direct";
@@ -384,7 +483,6 @@ window.onload = function () {
     document.getElementById("output").innerHTML = "";
   });
 };
-
-  </script>
+</script>
 </body>
 </html>

@@ -152,7 +152,7 @@ def compute_direct_route_info(route, route_num=1):
     }
     return summary, steps
 
-def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
+def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6):
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -160,6 +160,9 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
     required_ids = {load["load_id"] for load in loads if load.get("required")}
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
+        # Prune by max chain length
+        if len(path) > max_chain_amount:
+            return
         if path:
             total_km = loaded_km + empty_km + path[-1]["return_km"]
             loaded_pct = loaded_km / total_km if total_km else 0
@@ -177,20 +180,20 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
                     "total_km": round(total_km, 1),
                     "revenue": round(revenue, 2),
                     "rpm": round(rpm, 2),
-                    "step_breakdown": []  # for frontend to optionally fill later
+                    "step_breakdown": []
                 })
             # Prune if max possible loaded pct is now below threshold
             remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
             possible_total = loaded_km + remaining_loaded
             possible_km = total_km + remaining_loaded
             if possible_km and (possible_total / possible_km < loaded_pct_threshold):
-                return  # Can't recover above threshold, prune
+                return
 
         # --- EARLY PRUNE for required loads ---
         remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
         remaining_required = required_ids - set([l["load_id"] for l in path])
         if len(remaining_unused) < len(remaining_required):
-            return  # Not enough loads left to satisfy required set
+            return
 
         for load in loads:
             lid = load["load_id"]
@@ -211,7 +214,7 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65):
                 reload_key = f"load_{lid}"
                 reload_info = prev["reload_options"].get(reload_key)
                 if not reload_info:
-                    continue  # Can't chain
+                    continue
                 new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
                 new_loaded = loaded_km + load["loaded_km"]
                 new_revenue = revenue + load.get("revenue", 0.0)
@@ -232,6 +235,8 @@ def handle_dispatch():
     loads = data.get("loads", [])
     start_location = data.get("start", "Brandon, MB")
     end_location = data.get("end", "Brandon, MB")
+    loaded_pct_goal = float(data.get("loaded_pct_goal", 65)) / 100
+    max_chain_amount = int(data.get("max_chain_amount", 6))
 
     if not loads:
         return jsonify({"error": "Missing loads in request."}), 400
@@ -290,7 +295,8 @@ def handle_dispatch():
             "loads": result
         }
 
-        # Prompt as before
+        # Add extra info for LLM if you want (not required for this example)
+
         prompt = (
             "You are Dispatchy, a logistics planning expert. "
             "You are given load and distance data (`enriched_data`) describing possible freight loads, their cities, and the distances between all relevant points.\n"
@@ -309,8 +315,8 @@ def handle_dispatch():
             "    4. **Loaded %**: loaded km / total km.\n"
             "    5. **Revenue**: For each load, revenue = rate × weight; total revenue is sum of all loads in the route.\n"
             "    6. **RPM ($/mile)**: total revenue / (total km × 0.621371).\n"
-            "- Only list routes that are 65% loaded or higher.\n"
-            "- DO NOT include or list any routes where loaded % is less than 65%. "
+            f"- Only list routes that are {int(loaded_pct_goal*100)}% loaded or higher.\n"
+            "- DO NOT include or list any routes where loaded % is less than this threshold. "
             "- DO NOT explain, show, or mention any route below the threshold—only show those that qualify."
             "- Important: Do NOT use revenue or RPM as a filter. They are for display only."
             "- Always show all qualifying routes, even if revenue or RPM is zero."
@@ -421,6 +427,8 @@ def handle_manual_routes():
     loads = data.get("loads", [])
     start_location = data.get("start", "Brandon, MB")
     end_location = data.get("end", "Brandon, MB")
+    loaded_pct_goal = float(data.get("loaded_pct_goal", 65)) / 100
+    max_chain_amount = int(data.get("max_chain_amount", 6))
 
     if not loads:
         return jsonify({"error": "Missing loads in request."}), 400
@@ -482,7 +490,11 @@ def handle_manual_routes():
             "loads": result
         }
 
-        routes = enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65)
+        routes = enumerate_qualifying_routes(
+            enriched_data,
+            loaded_pct_threshold=loaded_pct_goal,
+            max_chain_amount=max_chain_amount
+        )
 
         # For each summary route, expand to breakdown like direct
         expanded = []
@@ -519,7 +531,7 @@ def handle_manual_routes():
 
 @app.route("/")
 def show_dispatch_form():
-    return render_template("dispatch_form.html")
+    return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
