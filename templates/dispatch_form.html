@@ -481,8 +481,13 @@ window.toggleDetails = function (id) {
 
 function saveThisRoute(btn) {
   const routeDiv = btn.closest('.route-block');
-  const name = prompt("Enter a name for this trip:");
+  let name = prompt("Enter a name for this trip:");
   if (!name) return;
+  const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
+  if (allSaves[name]) {
+    const confirmOverwrite = confirm(`A trip named "${name}" already exists. Overwrite it?`);
+    if (!confirmOverwrite) return;
+  }
   const start = routeDiv.querySelector("input[name='start']").value.trim();
   const end = routeDiv.querySelector("input[name='end']").value.trim();
   const loads = Array.from(routeDiv.querySelectorAll(".load-row")).map(row => ({
@@ -494,7 +499,6 @@ function saveThisRoute(btn) {
     required: row.querySelector("input[name='required']")?.checked || false
   }));
   const saveObj = { start, end, loads };
-  const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
   allSaves[name] = saveObj;
   localStorage.setItem("savedTrips", JSON.stringify(allSaves));
   alert(`Trip "${name}" saved!`);
@@ -503,26 +507,41 @@ function saveThisRoute(btn) {
 function showLoadMenu(btn) {
   const routeDiv = btn.closest('.route-block');
   const menuDiv = routeDiv.querySelector('.load-menu');
+
+  if (menuDiv.style.display === "block") {
+    menuDiv.style.display = "none";
+    menuDiv.innerHTML = "";
+    return;
+  }
+
   const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
   const names = Object.keys(allSaves);
+
   if (!names.length) {
     menuDiv.innerHTML = "<div style='color:#999;'>No saved trips found.</div>";
     menuDiv.style.display = "block";
     return;
   }
+
   menuDiv.innerHTML = `
-    <label>Select a trip to load:</label>
-    <ul style="list-style:none; padding:0;">
+    <label for="savedTripSelect">Load saved trip:</label>
+    <select id="savedTripSelect" onchange="handleTripSelect(this)">
+      <option value="">-- Select a trip --</option>
+      ${names.map(n => `<option value="${n}">${n}</option>`).join('')}
+    </select>
+    <ul style="list-style:none; padding:0; margin-top:10px;">
       ${names.map(n => `
         <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <button onclick="loadNamedTrip(this, '${n}')" style="flex-grow:1; text-align:left;">${n}</button>
+          <span style="flex-grow:1;">${n}</span>
           <button onclick="deleteSavedTrip('${n}', this)" style="color:#e53e3e;">❌</button>
         </li>
-      `).join("")}
+      `).join('')}
     </ul>
   `;
+  menuDiv.dataset.routeIndex = routeDiv.dataset.routeIndex;
   menuDiv.style.display = "block";
 }
+
 
 function loadNamedTrip(btn, name) {
   const routeDiv = btn.closest('.route-block');
@@ -534,6 +553,8 @@ function loadNamedTrip(btn, name) {
   loadsContainer.innerHTML = "";
   saved.loads.forEach(load => addLoadRowWithValues(loadsContainer, load));
   renderLoadHeaderAndRows(routeDiv);
+  const menuDiv = routeDiv.querySelector('.load-menu');
+  if (menuDiv) menuDiv.style.display = 'none';
 }
 
 function deleteSavedTrip(name, btn) {
@@ -542,6 +563,13 @@ function deleteSavedTrip(name, btn) {
   delete allSaves[name];
   localStorage.setItem("savedTrips", JSON.stringify(allSaves));
   showLoadMenu(btn.closest('.route-block').querySelector("button[onclick^='showLoadMenu']"));
+}
+
+function handleTripSelect(selectEl) {
+  const name = selectEl.value;
+  if (!name) return;
+  const routeDiv = selectEl.closest('.route-block');
+  loadNamedTrip(routeDiv.querySelector('button[onclick^="loadNamedTrip"]'), name);
 }
 
 window.onload = function () {
