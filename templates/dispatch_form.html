@@ -9,8 +9,7 @@
     label { display: block; margin-top: 10px; }
     input, button, select { padding: 5px; margin-top: 5px; }
     .route-block { border: 1px solid #aaa; padding: 16px; margin-bottom: 24px; background: #f9f9f9; border-radius: 7px; }
-    .route-block h3 { margin: 0 0 10px 0; position: relative; }
-    .route-block h3 button { margin-left: 5px; }
+    .route-block h3 { margin: 0 0 10px 0; }
     .load-row { margin-bottom: 10px; display: flex; align-items: center; }
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
@@ -31,6 +30,7 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
+  <!-- Dynamically loaded Google Maps API in JS below -->
 </head>
 <body>
   <h2>Dispatch Optimizer</h2>
@@ -42,14 +42,21 @@
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
     <div class="settings-block" id="extraSettings" style="display:none;">
-      <label>Loaded % Goal: <input type="number" id="loadedPctGoal" value="65" min="1" max="100" step="1" /></label>
-      <label>Max Chain Length: <input type="number" id="maxChainLength" value="6" min="1" max="20" step="1" /></label>
+      <label>
+        Loaded % Goal:
+        <input type="number" id="loadedPctGoal" value="65" min="1" max="100" step="1" />
+      </label>
+      <label>
+        Max Chain Length:
+        <input type="number" id="maxChainLength" value="6" min="1" max="20" step="1" />
+      </label>
     </div>
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
   </form>
 
+  <!-- Sorting toggle for manual mode -->
   <div id="sortToggleDiv" class="sort-toggle" style="display:none;">
     <label>Sort By:
       <select id="sortToggle">
@@ -61,8 +68,20 @@
 
   <div id="spinner">
     <svg width="50" height="50" viewBox="0 0 50 50">
-      <circle cx="25" cy="25" r="20" stroke="#319795" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="90" stroke-dashoffset="60">
-        <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite"/>
+      <circle
+        cx="25" cy="25" r="20"
+        stroke="#319795" stroke-width="5"
+        fill="none"
+        stroke-linecap="round"
+        stroke-dasharray="90"
+        stroke-dashoffset="60">
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 25 25"
+          to="360 25 25"
+          dur="1s"
+          repeatCount="indefinite"/>
       </circle>
     </svg>
     <div style="color:#319795;">Calculating optimal routes...</div>
@@ -70,6 +89,29 @@
   <div id="output" style="margin-top:30px;"></div>
 
 <script>
+const GOOGLE_API_KEY = "{{ google_api_key }}";
+let googleMapsLoaded = false;
+function loadGoogleMapsApi(callback) {
+  if (window.google && window.google.maps) {
+    callback();
+    return;
+  }
+  if (document.getElementById('googleMapsScript')) {
+    document.getElementById('googleMapsScript').addEventListener('load', callback);
+    return;
+  }
+  const script = document.createElement('script');
+  script.id = 'googleMapsScript';
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&callback=onGoogleMapsLoaded`;
+  script.async = true;
+  script.defer = true;
+  window.onGoogleMapsLoaded = function () {
+    googleMapsLoaded = true;
+    callback();
+  };
+  document.head.appendChild(script);
+}
+
 let routeCount = 0;
 let currentRouteMode = "direct";
 let resultsCache = [];
@@ -83,7 +125,7 @@ function addRouteBlock() {
   routeDiv.innerHTML = `
     <h3>
       Route ${routeCount}
-      <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove</button>
+      <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>
       <button type="button" onclick="saveThisRoute(this)" style="float:right;margin-left:8px;">💾 Save</button>
       <button type="button" onclick="showLoadMenu(this)" style="float:right;">📂 Load</button>
     </h3>
@@ -107,70 +149,335 @@ function removeRouteBlock(btn) {
   updateRouteUI();
 }
 
-function updateRouteNumbers() {
-  const blocks = document.querySelectorAll('.route-block');
-  blocks.forEach((block, i) => {
-    const h3 = block.querySelector('h3');
-    h3.querySelector("button").innerText = `Remove`;
-    block.dataset.routeIndex = i + 1;
-    h3.childNodes[0].nodeValue = `Route ${i + 1} `;
-  });
-  routeCount = blocks.length;
-}
-
-function renderLoadHeaderAndRows(routeDiv) {
-  const header = routeDiv.querySelector('.load-header');
-  if (!header) return;
-  header.innerHTML = `
-    <span>Pickup</span><span>Dropoff</span>
-    ${currentRouteMode === "best" ? "<span># of Loads</span>" : ""}
-    <span>Rate ($/MT)</span><span>Weight (MT)</span>
-    ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}<span></span>
-  `;
+function addLoadRow(routeBtn) {
+  const routeDiv = routeBtn.closest('.route-block');
   const loadsContainer = routeDiv.querySelector('.loadsContainer');
-  const existing = [...loadsContainer.querySelectorAll(".load-row")].map(row => ({
-    pickup: row.querySelector("input[name='pickup']").value,
-    dropoff: row.querySelector("input[name='dropoff']").value,
-    rate: row.querySelector("input[name='rate']").value,
-    weight: row.querySelector("input[name='weight']").value,
-    count: row.querySelector("input[name='count']")?.value || "1",
-    required: row.querySelector("input[name='required']")?.checked || false,
-  }));
-  loadsContainer.innerHTML = "";
-  existing.forEach(v => addLoadRowWithValues(loadsContainer, v));
-  if (!existing.length) addLoadRowWithValues(loadsContainer, {});
+  addLoadRowWithValues(loadsContainer, {
+    pickup: "",
+    dropoff: "",
+    rate: "0",
+    weight: "43",
+    required: false,
+    count: "1"
+  });
 }
 
-function addLoadRow(btn) {
-  const container = btn.closest(".route-block").querySelector(".loadsContainer");
-  addLoadRowWithValues(container, {});
-}
-
-function addLoadRowWithValues(container, values) {
+function addLoadRowWithValues(loadsContainer, values) {
+  const mode = currentRouteMode;
   const row = document.createElement('div');
   row.className = "load-row";
   row.innerHTML = `
-    <input type="text" name="pickup" placeholder="Pickup City" value="${values.pickup || ""}" required />
-    <input type="text" name="dropoff" placeholder="Dropoff City" value="${values.dropoff || ""}" required />
-    ${currentRouteMode === "best" ? `<input type="number" name="count" value="${values.count || 1}" min="1" required />` : ""}
-    <input type="number" name="rate" value="${values.rate || 0}" min="0" step="0.01" required />
-    <input type="number" name="weight" value="${values.weight || 43}" min="0" step="0.01" required />
-    ${currentRouteMode === "manual" ? `<input type="checkbox" name="required" ${values.required ? "checked" : ""} />` : ""}
+    <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
+    ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
+    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
+    <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
+    ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
     <button type="button" onclick="removeLoadRow(this)">❌</button>
   `;
-  container.appendChild(row);
+  loadsContainer.appendChild(row);
 }
 
 function removeLoadRow(btn) {
   btn.parentElement.remove();
 }
 
-function updateRouteUI() {
-  document.getElementById("extraSettings").style.display = (currentRouteMode !== "direct") ? "block" : "none";
-  document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
+function updateRouteNumbers() {
   const blocks = document.querySelectorAll('.route-block');
-  blocks.forEach(block => renderLoadHeaderAndRows(block));
+  blocks.forEach((block, i) => {
+    const h3 = block.querySelector('h3');
+    h3.innerHTML = `Route ${i + 1} <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>`;
+    block.dataset.routeIndex = i + 1;
+  });
+  routeCount = blocks.length;
 }
+
+function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
+  const header = routeDiv.querySelector('.load-header');
+  if (!header) return;
+  let headerHtml = `
+    <span>Pickup</span>
+    <span>Dropoff</span>
+    ${currentRouteMode === "best" ? "<span># of Loads</span>" : ""}
+    <span>Rate ($/MT)</span>
+    <span>Weight (MT)</span>
+    ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}
+    <span></span>
+  `;
+  header.innerHTML = headerHtml;
+  const loadsContainer = routeDiv.querySelector('.loadsContainer');
+  const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
+  const oldVals = rows.map(row => ({
+    pickup: row.querySelector("input[name='pickup']").value,
+    dropoff: row.querySelector("input[name='dropoff']").value,
+    rate: row.querySelector("input[name='rate']").value,
+    weight: row.querySelector("input[name='weight']").value,
+    required: false,
+    count: row.querySelector("input[name='count']") ? row.querySelector("input[name='count']").value : "1"
+  }));
+  loadsContainer.innerHTML = "";
+  oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
+  if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
+}
+
+function updateRouteUI() {
+  const addRouteBtn = document.getElementById("addRouteBtn");
+  const routesContainer = document.getElementById("routesContainer");
+  const blocks = document.querySelectorAll('.route-block');
+  blocks.forEach(block => renderLoadHeaderAndRows(block, true));
+  blocks.forEach(block => {
+    const startInput = block.querySelector("input[name='start']");
+    const endInput = block.querySelector("input[name='end']");
+    if (currentRouteMode === "direct") {
+      startInput.removeAttribute("required");
+      endInput.removeAttribute("required");
+    } else {
+      startInput.setAttribute("required", "required");
+      endInput.setAttribute("required", "required");
+    }
+  });
+  if (currentRouteMode === "direct") {
+    addRouteBtn.style.display = "inline-block";
+    const removeBtns = document.querySelectorAll('.remove-route-btn');
+    removeBtns.forEach(btn => btn.style.display = (routeCount > 1 ? "inline" : "none"));
+  } else {
+    addRouteBtn.style.display = "none";
+    while (routesContainer.children.length > 1) {
+      routesContainer.removeChild(routesContainer.lastChild);
+    }
+    routeCount = 1;
+    updateRouteNumbers();
+    const removeBtns = document.querySelectorAll('.remove-route-btn');
+    removeBtns.forEach(btn => btn.style.display = "none");
+  }
+  document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
+  document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
+}
+
+// --- SUBMIT HANDLER ---
+document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  document.getElementById("output").innerHTML = "";
+  document.getElementById("spinner").style.display = "block";
+  resultsCache = [];
+  // Collect route blocks
+  const routeBlocks = document.querySelectorAll('.route-block');
+  let dataToSend = [];
+  for (const routeDiv of routeBlocks) {
+    const pickups = routeDiv.querySelectorAll("input[name='pickup']");
+    const dropoffs = routeDiv.querySelectorAll("input[name='dropoff']");
+    let start = routeDiv.querySelector("input[name='start']").value.trim();
+    let end = routeDiv.querySelector("input[name='end']").value.trim();
+    const counts = routeDiv.querySelectorAll("input[name='count']");
+    const rates = routeDiv.querySelectorAll("input[name='rate']");
+    const weights = routeDiv.querySelectorAll("input[name='weight']");
+    const requireds = routeDiv.querySelectorAll("input[name='required']");
+    const isManualMode = (currentRouteMode === "manual");
+    const isBestMode = (currentRouteMode === "best");
+    const loads = [];
+    for (let i = 0; i < pickups.length; i++) {
+      const pickup = pickups[i].value.trim();
+      const dropoff = dropoffs[i].value.trim();
+      const count = isBestMode ? parseInt(counts[i].value) : 1;
+      const rate = parseFloat(rates[i].value);
+      const weight = parseFloat(weights[i].value);
+      const required = isManualMode && requireds[i] ? requireds[i].checked : false;
+      for (let j = 0; j < count; j++) {
+        loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required });
+      }
+    }
+    if (currentRouteMode === "direct") {
+      if (!start && loads.length) {
+        start = loads[0].pickupCity || "";
+      }
+      if (!end && loads.length) {
+        end = loads[loads.length - 1].dropoffCity || "";
+      }
+    }
+    dataToSend.push({ start, end, loads });
+  }
+
+  // Get extra settings if relevant
+  let loadedPctGoal = Number(document.getElementById("loadedPctGoal")?.value || 65);
+  let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 6);
+
+  try {
+    let endpoint, payload;
+    if (currentRouteMode === "manual") {
+      endpoint = "/manual";
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
+    } else if (currentRouteMode === "direct") {
+      endpoint = "/direct_route_multi";
+      payload = { routes: dataToSend };
+    } else {
+      endpoint = "/dispatch";
+      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (currentRouteMode === "manual" || currentRouteMode === "direct") {
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      resultsCache = Array.isArray(data) ? data : data.routes;
+      renderResultsTable(resultsCache);
+    } else {
+      const html = await response.text();
+      document.getElementById("output").innerHTML = html;
+    }
+  } catch (err) {
+    document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
+  } finally {
+    document.getElementById("spinner").style.display = "none";
+  }
+});
+
+document.getElementById("sortToggle").addEventListener("change", function () {
+  if (resultsCache.length) renderResultsTable(resultsCache);
+});
+
+function getOrderedCitiesFromSteps(steps) {
+  let cities = [];
+  steps.forEach(s => {
+    let seg = s.segment.replace(/<[^>]+>/g, '');
+    let parts = seg.split('→').map(x => x.trim());
+    parts.forEach(p => {
+      // Always include last city even if same as first
+      if (!cities.length || p !== cities[cities.length-1] || p === parts[parts.length-1]) {
+        cities.push(p);
+      }
+    });
+  });
+  // Ensure last city from last segment is included
+  if (cities[cities.length-1] !== steps[steps.length-1].segment.split('→').pop().trim()) {
+    cities.push(steps[steps.length-1].segment.split('→').pop().trim());
+  }
+  return cities;
+}
+
+// Google Map Plotting
+function plotGoogleRouteMap(steps, mapId) {
+  let cities = getOrderedCitiesFromSteps(steps);
+  if (cities.length < 2) return;
+  loadGoogleMapsApi(() => {
+    const map = new google.maps.Map(document.getElementById(mapId), {
+      zoom: 6,
+      center: { lat: 50, lng: -99 }
+    });
+    const directionsService = new google.maps.DirectionsService();
+    const directionsRenderer = new google.maps.DirectionsRenderer({ map });
+    const [origin, ...rest] = cities;
+    const destination = rest.pop();
+    const waypoints = rest.map(city => ({ location: city, stopover: true }));
+    directionsService.route({
+      origin: origin,
+      destination: destination,
+      waypoints: waypoints,
+      travelMode: google.maps.TravelMode.DRIVING
+    }, (result, status) => {
+      if (status === "OK") {
+        directionsRenderer.setDirections(result);
+      } else {
+        // fallback: just drop pins
+        cities.forEach(city => {
+          new google.maps.Geocoder().geocode({ address: city }, (res, stat) => {
+            if (stat === 'OK' && res[0]) {
+              new google.maps.Marker({ map, position: res[0].geometry.location, title: city });
+            }
+          });
+        });
+      }
+    });
+  });
+}
+
+function renderResultsTable(routes) {
+  if (!routes.length) {
+    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
+    return;
+  }
+  let sortBy = document.getElementById("sortToggle").value;
+  let sorted = [...routes].sort((a, b) => {
+    let aMetric = a.summary ? a.summary[sortBy] : a[sortBy];
+    let bMetric = b.summary ? b.summary[sortBy] : b[sortBy];
+    return bMetric - aMetric;
+  });
+  let ths = `<tr>
+    <th>City Sequence</th>
+    <th>Load IDs</th>
+    <th>Loaded km</th>
+    <th>Empty km</th>
+    <th>Loaded %</th>
+    <th>Total km</th>
+    <th>Revenue</th>
+    <th>RPM ($/mile)</th>
+    <th>Details</th>
+  </tr>`;
+  let trs = sorted.map((r, i) => {
+    let summary = r.summary || r;
+    let citySeq = r.city_sequence || (summary.start + " → ... → " + summary.end);
+    let loadIds = (r.load_ids && r.load_ids.length) ? r.load_ids.join(", ") : (summary.load_ids ? summary.load_ids.join(", ") : "-");
+    let expandedId = `expando${i}`;
+    return `<tr>
+      <td>${citySeq}</td>
+      <td>${loadIds}</td>
+      <td>${summary.loaded_km}</td>
+      <td>${summary.empty_km}</td>
+      <td>${summary.loaded_pct}%</td>
+      <td>${summary.total_km}</td>
+      <td>${summary.total_revenue !== undefined ? summary.total_revenue : summary.revenue}</td>
+      <td>${summary.rpm}</td>
+      <td><button onclick="toggleDetails('${expandedId}')">Expand</button></td>
+    </tr>
+    <tr id="${expandedId}" style="display:none;background:#f6faff"><td colspan="9">${renderBreakdownTable(r.step_breakdown, i)}</td></tr>`;
+  }).join("");
+  document.getElementById("output").innerHTML = `<table class="results-table">${ths}${trs}</table>`;
+}
+
+function renderBreakdownTable(steps, routeIdx = 0) {
+  if (!steps || !steps.length) return "<div>No breakdown available.</div>";
+  let th = `<tr>
+    <th>Step Type</th>
+    <th>Segment</th>
+    <th>KMs</th>
+    <th>Rate</th>
+    <th>Weight</th>
+    <th>Revenue</th>
+    <th>RPM ($/mile)</th>
+  </tr>`;
+  let rows = steps.map(s =>
+    `<tr>
+      <td>${capitalize(s.type)}</td>
+      <td>${s.segment}</td>
+      <td>${s.kms}</td>
+      <td>${s.rate}</td>
+      <td>${s.weight}</td>
+      <td>${s.revenue}</td>
+      <td>${s.rpm}</td>
+    </tr>`
+  ).join("");
+  // --- Add map container (unique per details section)
+  const mapId = `routeMap${routeIdx}`;
+  setTimeout(() => plotGoogleRouteMap(steps, mapId), 0);
+  return `
+    <table class="results-table" style="margin:8px 0">${th}${rows}</table>
+    <div style="height:320px;margin:10px 0;border-radius:12px;overflow:hidden;">
+      <div id="${mapId}" style="width:100%;height:100%;"></div>
+    </div>
+  `;
+}
+
+function capitalize(str) {
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+}
+
+window.toggleDetails = function (id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.style.display = (row.style.display === "none") ? "" : "none";
+};
 
 function saveThisRoute(btn) {
   const routeDiv = btn.closest('.route-block');
