@@ -131,7 +131,6 @@ function addRouteBlock() {
       <button type="button" onclick="clearSelectedTrip(this)" style="float:right;">Clear</button>
       <button type="button" onclick="deleteSelectedTrip(this)" style="float:right; margin-left: 8px; color:#e53e3e;">❌</button>
     </h3>
-    <div class="load-menu" style="display:none; margin: 10px 0;"></div>
     <label>Start Location:</label>
     <input type="text" name="start" placeholder="Starting Point" required />
     <label>End Location:</label>
@@ -489,83 +488,25 @@ window.toggleDetails = function (id) {
   row.style.display = (row.style.display === "none") ? "" : "none";
 };
 
-function saveThisRoute(btn) {
+function clearSelectedTrip(btn) {
   const routeDiv = btn.closest('.route-block');
-  let name = prompt("Enter a name for this trip:");
-  if (!name) return;
-  const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
-  if (allSaves[name]) {
-    const confirmOverwrite = confirm(`A trip named "${name}" already exists. Overwrite it?`);
-    if (!confirmOverwrite) return;
-  }
-  const start = routeDiv.querySelector("input[name='start']").value.trim();
-  const end = routeDiv.querySelector("input[name='end']").value.trim();
-  const loads = Array.from(routeDiv.querySelectorAll(".load-row")).map(row => ({
-    pickup: row.querySelector("input[name='pickup']").value,
-    dropoff: row.querySelector("input[name='dropoff']").value,
-    rate: row.querySelector("input[name='rate']").value,
-    weight: row.querySelector("input[name='weight']").value,
-    count: row.querySelector("input[name='count']")?.value || "1",
-    required: row.querySelector("input[name='required']")?.checked || false
-  }));
-  const saveObj = { start, end, loads };
-  allSaves[name] = saveObj;
-  localStorage.setItem("savedTrips", JSON.stringify(allSaves));
-  alert(`Trip "${name}" saved!`);
-}
+  const select = routeDiv.querySelector(".trip-select");
 
-function showLoadMenu(btn) {
-  const routeDiv = btn.closest('.route-block');
-  const menuDiv = routeDiv.querySelector('.load-menu');
+  // Clear input fields
+  routeDiv.querySelector("input[name='start']").value = "";
+  routeDiv.querySelector("input[name='end']").value = "";
 
-  if (menuDiv.style.display === "block") {
-    menuDiv.style.display = "none";
-    menuDiv.innerHTML = "";
-    return;
-  }
-
-  const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
-  const names = Object.keys(allSaves);
-
-  if (!names.length) {
-    menuDiv.innerHTML = "<div style='color:#999;'>No saved trips found.</div>";
-    menuDiv.style.display = "block";
-    return;
-  }
-
-  menuDiv.innerHTML = `
-    <label for="savedTripSelect">Load saved trip:</label>
-    <select id="savedTripSelect" onchange="handleTripSelect(this)">
-      <option value="">-- Select a trip --</option>
-      ${names.map(n => `<option value="${n}">${n}</option>`).join('')}
-    </select>
-    <ul style="list-style:none; padding:0; margin-top:10px;">
-      ${names.map(n => `
-        <li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-          <span style="flex-grow:1;">${n}</span>
-          <button onclick="deleteSavedTrip('${n}', this)" style="color:#e53e3e;">❌</button>
-        </li>
-      `).join('')}
-    </ul>
-  `;
-  menuDiv.dataset.routeIndex = routeDiv.dataset.routeIndex;
-  menuDiv.style.display = "block";
-}
-
-
-function loadNamedTrip(btn, name) {
-  const routeDiv = btn.closest('.route-block');
-  const saved = JSON.parse(localStorage.getItem("savedTrips") || "{}")[name];
-  if (!saved) return;
-  routeDiv.querySelector("input[name='start']").value = saved.start || "";
-  routeDiv.querySelector("input[name='end']").value = saved.end || "";
+  // Clear all loads
   const loadsContainer = routeDiv.querySelector('.loadsContainer');
   loadsContainer.innerHTML = "";
-  saved.loads.forEach(load => addLoadRowWithValues(loadsContainer, load));
+  addLoadRowWithValues(loadsContainer, {}); // Add one empty row
+
+  // Clear dropdown selection
+  if (select) select.value = "";
+
   renderLoadHeaderAndRows(routeDiv);
-  const menuDiv = routeDiv.querySelector('.load-menu');
-  if (menuDiv) menuDiv.style.display = 'none';
 }
+
 
 function deleteSelectedTrip(btn) {
   const routeDiv = btn.closest('.route-block');
@@ -610,14 +551,6 @@ function saveThisRoute(btn) {
   populateTripDropdown(routeDiv);
   select.value = name;
   alert(`Trip "${name}" saved!`);
-}
-
-function deleteSavedTrip(name, btn) {
-  if (!confirm(`Delete trip "${name}"? This cannot be undone.`)) return;
-  const allSaves = JSON.parse(localStorage.getItem("savedTrips") || "{}");
-  delete allSaves[name];
-  localStorage.setItem("savedTrips", JSON.stringify(allSaves));
-  showLoadMenu(btn.closest('.route-block').querySelector("button[onclick^='showLoadMenu']"));
 }
 
 function handleTripSelect(selectEl) {
