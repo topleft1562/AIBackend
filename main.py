@@ -348,7 +348,7 @@ def handle_dispatch():
             "Here is the enriched_data:\n"
             f"{json.dumps(enriched_data, indent=2)}"
         )
-        response = agent.stream_chat(prompt)
+        response = agent.chat(prompt)
         html_output = response.response
 
         return render_template_string(f"""
