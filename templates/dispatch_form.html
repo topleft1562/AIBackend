@@ -74,28 +74,39 @@
     <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
   </div>
 
-  <div id="spinner">
-    <svg width="50" height="50" viewBox="0 0 50 50">
-      <circle
-        cx="25" cy="25" r="20"
-        stroke="#319795" stroke-width="5"
-        fill="none"
-        stroke-linecap="round"
-        stroke-dasharray="90"
-        stroke-dashoffset="60">
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 25 25"
-          to="360 25 25"
-          dur="1s"
-          repeatCount="indefinite"/>
-      </circle>
-    </svg>
-    <div style="color:#319795;">Calculating optimal routes...</div>
+<div id="spinner" style="display:none; text-align:center; margin-top:20px;">
+  <!-- Progress Bar -->
+  <div style="width: 100%; max-width: 400px; margin: 0 auto 16px auto; background: #eee; border-radius: 8px; overflow: hidden;">
+    <div id="progressBarFill" style="width: 0%; height: 12px; background: #319795; transition: width 0.3s;"></div>
   </div>
+
+  <!-- Spinner Icon -->
+  <svg width="50" height="50" viewBox="0 0 50 50">
+    <circle
+      cx="25" cy="25" r="20"
+      stroke="#319795" stroke-width="5"
+      fill="none"
+      stroke-linecap="round"
+      stroke-dasharray="90"
+      stroke-dashoffset="60">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        from="0 25 25"
+        to="360 25 25"
+        dur="1s"
+        repeatCount="indefinite"/>
+    </circle>
+  </svg>
+
+  <!-- Text -->
+  <div style="color:#319795; margin-top: 10px;">
+    Calculating optimal routes... <span id="progressText">0%</span>
+  </div>
+</div>
+
   <div id="output" style="margin-top:30px;"></div>
-  
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 document.getElementById("excelInput").addEventListener("change", async (e) => {
@@ -165,6 +176,19 @@ function loadGoogleMapsApi(callback) {
     callback();
   };
   document.head.appendChild(script);
+}
+
+function startAsyncDispatch(payload) {
+  fetch("/dispatch_async", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json())
+    .then(data => {
+      const taskId = data.task_id;
+      pollTaskProgress(taskId);
+    });
 }
 
 let routeCount = 0;
@@ -359,37 +383,83 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 6);
 
   try {
-    let endpoint, payload;
-    if (currentRouteMode === "manual") {
-      endpoint = "/manual";
-      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
-    } else if (currentRouteMode === "direct") {
-      endpoint = "/direct_route_multi";
-      payload = { routes: dataToSend };
-    } else {
-      endpoint = "/dispatch";
-      payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_length: maxChainLength };
-    }
-    const response = await fetch(endpoint, {
+  let endpoint, payload;
+  if (currentRouteMode === "manual") {
+    // Use async version
+    endpoint = "/dispatch_async";
+    payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_amount: maxChainLength };
+
+    // Show spinner + launch async task
+    document.getElementById("spinner").style.display = "block";
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-    if (currentRouteMode === "manual" || currentRouteMode === "direct") {
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      resultsCache = Array.isArray(data) ? data : data.routes;
-      renderResultsTable(resultsCache);
-    } else {
-      const html = await response.text();
-      document.getElementById("output").innerHTML = html;
-    }
-  } catch (err) {
-    document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
-  } finally {
+    const { task_id } = await res.json();
+    pollTaskProgress(task_id); // defined below
+    return; // Exit early — everything else is handled via polling
+  }
+
+  if (currentRouteMode === "direct") {
+    endpoint = "/direct_route_multi";
+    payload = { routes: dataToSend };
+  } else {
+    endpoint = "/dispatch";
+    payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_amount: maxChainLength };
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (currentRouteMode === "direct") {
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    resultsCache = Array.isArray(data) ? data : data.routes;
+    renderResultsTable(resultsCache);
+  } else {
+    const html = await response.text();
+    document.getElementById("output").innerHTML = html;
+  }
+} catch (err) {
+  document.getElementById("output").innerHTML = "<div style='color:red;'>Error. Please try again.<br>" + (err.message || err) + "</div>";
+} finally {
+  if (currentRouteMode !== "manual") {
     document.getElementById("spinner").style.display = "none";
   }
+}
 });
+
+// ⬇️ Keep this outside the submit handler!
+function pollTaskProgress(taskId) {
+  const spinner = document.getElementById("spinner");
+  spinner.innerHTML = "⏳ Processing... <span id='progressText'>0%</span>";
+
+  const interval = setInterval(async () => {
+    const res = await fetch(`/task_status/${taskId}`);
+    const data = await res.json();
+
+    if (data.progress !== undefined) {
+      document.getElementById("progressText").innerText = `${data.progress}%`;
+      document.getElementById("progressBarFill").style.width = `${data.progress}%`;
+    }
+
+    if (data.state === "complete") {
+      clearInterval(interval);
+      spinner.style.display = "none";
+      resultsCache = Array.isArray(data.result) ? data.result : [];
+      renderResultsTable(resultsCache);
+    }
+
+    if (data.state === "error") {
+      clearInterval(interval);
+      spinner.innerHTML = `<span style="color:red;">❌ Error: ${data.error}</span>`;
+    }
+  }, 1000);
+}
 
 document.getElementById("sortToggle").addEventListener("change", function () {
   if (resultsCache.length) renderResultsTable(resultsCache);

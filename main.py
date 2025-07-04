@@ -17,6 +17,7 @@ GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 
 # Distance cache: ("origin|destination") => km
 DISTANCE_CACHE = {}
+TASKS = {}
 
 def normalize_city(city_str):
     city_str = city_str.replace(",", ", ").replace("  ", " ").title()
@@ -229,6 +230,46 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
     search([], set(), 0, 0, 0, [])
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
+
+@app.route("/dispatch_async", methods=["POST"])
+def dispatch_async():
+    data = request.json
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {"state": "in_progress", "progress": 0, "result": None}
+
+    def run_task():
+        try:
+            # Update progress in-place:
+            TASKS[task_id]["progress"] = 10
+
+            # Simulate long logic: call your existing route code
+            enriched_data = ...  # Build as before from data
+            # Optionally sleep or yield updates:
+            # time.sleep(2)
+            TASKS[task_id]["progress"] = 30
+
+            # Process routes (example: enumerate_qualifying_routes)
+            routes = enumerate_qualifying_routes(
+                enriched_data,
+                loaded_pct_threshold=...,  # your logic
+                max_chain_amount=...
+            )
+            TASKS[task_id]["progress"] = 90
+
+            TASKS[task_id] = {"state": "complete", "progress": 100, "result": routes}
+        except Exception as e:
+            TASKS[task_id] = {"state": "error", "error": str(e)}
+
+    Thread(target=run_task).start()
+    return jsonify({"task_id": task_id})
+    
+@app.route("/task_status/<task_id>")
+def task_status(task_id):
+    task = TASKS.get(task_id)
+    if not task:
+        return jsonify({"error": "Invalid task ID"}), 404
+    return jsonify(task)
+
 
 @app.route("/dispatch", methods=["POST"])
 def handle_dispatch():
