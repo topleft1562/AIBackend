@@ -474,6 +474,8 @@ function pollTaskProgress(taskId) {
     if (data.state === "complete") {
       clearInterval(interval);
       spinner.style.display = "none";
+      document.querySelector("button[type='submit']").style.display = "inline-block";
+      document.getElementById("cancelButton").style.display = "none";
       resultsCache = Array.isArray(data.result) ? data.result : [];
       renderResultsTable(resultsCache);
     }
@@ -482,6 +484,8 @@ function pollTaskProgress(taskId) {
       clearInterval(interval);
       document.getElementById("output").innerHTML = `<span style="color:red;">❌ Error: ${data.error}</span>`;
       spinner.style.display = "none";
+      document.querySelector("button[type='submit']").style.display = "inline-block";
+      document.getElementById("cancelButton").style.display = "none";
     }
   }, 1000);
 }
