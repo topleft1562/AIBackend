@@ -66,6 +66,14 @@
     </label>
   </div>
 
+  <!-- Excel Import -->
+  <div style="margin: 10px 0;">
+    <label for="excelInput" style="cursor:pointer;">
+      📥 <strong>Import from Excel</strong>
+    </label>
+    <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
+  </div>
+
   <div id="spinner">
     <svg width="50" height="50" viewBox="0 0 50 50">
       <circle
@@ -87,6 +95,53 @@
     <div style="color:#319795;">Calculating optimal routes...</div>
   </div>
   <div id="output" style="margin-top:30px;"></div>
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+document.getElementById("excelInput").addEventListener("change", async (e) => {
+  if (currentRouteMode === "direct") {
+    alert("Excel import is only available in AI or Best Route mode.");
+    return;
+  }
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const data = await file.arrayBuffer();
+  const workbook = XLSX.read(data);
+  const sheetName = workbook.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+  const formattedLoads = rows.map(r => {
+    const pickup = (r["Shipper City"] || "").toString().replace(/\/$/, "").trim();
+    const dropoff = (r["Consignee City"] || "").toString().replace(/\/$/, "").trim();
+    const weight = parseFloat(r["Weight"]) || 43;
+    return { pickupCity: pickup, dropoffCity: dropoff, weight, rate: 0 };
+  }).filter(r => r.pickupCity && r.dropoffCity);
+
+  // Remove duplicates by pickup+dropoff+weight
+  const uniqueLoads = Array.from(
+    new Map(formattedLoads.map(load => [load.pickupCity + load.dropoffCity + load.weight, load])).values()
+  );
+
+  const routeDiv = document.querySelector(".route-block");
+  const loadsContainer = routeDiv.querySelector('.loadsContainer');
+  loadsContainer.innerHTML = "";
+  uniqueLoads.forEach(load => {
+    addLoadRowWithValues(loadsContainer, {
+      pickup: load.pickupCity,
+      dropoff: load.dropoffCity,
+      weight: load.weight,
+      rate: 0,
+      count: "1",
+      required: false
+    });
+  });
+
+  renderLoadHeaderAndRows(routeDiv);
+  alert(`Imported ${uniqueLoads.length} loads.`);
+});
+</script>
 
 <script>
 const GOOGLE_API_KEY = "{{ google_api_key }}";
