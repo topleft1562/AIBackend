@@ -1,8 +1,7 @@
 import json
-from agent_engine import get_agent_runner
+from agent_engine import agent
 from hos import simulate_driver_plan
 
-agent = get_agent_runner()
 
 def extract_gap_segments(plan, route_matrix):
     """

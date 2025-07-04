@@ -2,16 +2,13 @@ import os
 import json
 import requests
 from urllib.parse import unquote
-from agent_engine import get_agent_runner
+from agent_engine import agent
 from flask import Flask, render_template, request, jsonify, render_template_string
 from collections import defaultdict
 from planner import generate_plan
 
 
 app = Flask(__name__)
-
-# Initialize LLM Agent for AI Mode
-agent = get_agent_runner()
 
 GOOGLE_KEY = os.environ.get("GOOGLE_KEY")
 
