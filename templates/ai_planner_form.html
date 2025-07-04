@@ -8,7 +8,7 @@
     body { font-family: sans-serif; padding: 20px; }
     label { display: block; margin-top: 10px; }
     input, button, select { padding: 6px; margin-top: 5px; }
-    .load-row, .driver-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .load-row, .driver-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
     .section { border: 1px solid #ccc; padding: 15px; margin-top: 20px; border-radius: 8px; background: #f9f9f9; }
     .section h3 { margin-top: 0; }
     .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -67,12 +67,11 @@ function addLoadRow() {
     <input type="number" placeholder="Rate" required step="0.01" />
     <input type="number" placeholder="Weight" required step="0.1" />
     <input type="number" placeholder="Required Amount" value="1" min="1" />
+    <label><input type="checkbox" class="priority-flag" /> Priority</label>
     <button type="button" onclick="this.parentElement.remove()">❌</button>
   `;
   document.getElementById('loadsContainer').appendChild(row);
 }
-
-// Submit handler
 
 const form = document.getElementById('aiDispatchForm');
 form.addEventListener('submit', async (e) => {
@@ -100,7 +99,8 @@ form.addEventListener('submit', async (e) => {
       },
       rate: parseFloat(inputs[6].value),
       weight: parseFloat(inputs[7].value),
-      required_amount: parseInt(inputs[8].value)
+      required_amount: parseInt(inputs[8].value),
+      priority: inputs[9].checked
     };
   });
   const min_eff = parseFloat(document.getElementById('minEfficiency').value) / 100;

@@ -555,7 +555,7 @@ if __name__ == "__main__":
 def show_dispatch_form():
     return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
 
-@app.route("/")
+@app.route("/ai")
 def show_dispatch_form():
     return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
 
