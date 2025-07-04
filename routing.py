@@ -67,3 +67,38 @@ def get_trip_time_with_load(origin, destination):
         "load_unload_hr": 3.0,
         "total_hr": round(info["duration_hr"] + 3.0, 2)
     }
+
+def build_route_matrix(loads, drivers):
+    """
+    Build a route matrix using Google Maps API from all relevant city pairs.
+    """
+    unique_pairs = set()
+
+    # Load-based pairs
+    for load in loads:
+        pickup = load["pickup"]["city"]
+        dropoff = load["dropoff"]["city"]
+        unique_pairs.add(_make_cache_key(pickup, dropoff))
+
+    # Driver repositioning: current → pickup, dropoff → home_base
+    for driver in drivers:
+        for load in loads:
+            unique_pairs.add(_make_cache_key(driver["location"], load["pickup"]["city"]))
+            unique_pairs.add(_make_cache_key(load["dropoff"]["city"], driver["home_base"]))
+
+    # Add inter-load repositioning (dropoff → pickup)
+    for i in range(len(loads)):
+        for j in range(len(loads)):
+            if i != j:
+                unique_pairs.add(_make_cache_key(loads[i]["dropoff"]["city"], loads[j]["pickup"]["city"]))
+
+    # Build the matrix
+    route_matrix = {}
+    for key in unique_pairs:
+        city1, city2 = key.split(" | ")
+        info = get_route_info(city1, city2)
+        if info:
+            route_matrix[key] = info
+
+    return route_matrix
+

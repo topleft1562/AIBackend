@@ -541,11 +541,16 @@ def ai_plan():
         if not loads or not drivers:
             return jsonify({"error": "Missing loads or drivers"}), 400
 
-        plan = generate_plan(loads, drivers, min_efficiency)
+        # 🔥 Build the route matrix here
+        route_matrix = build_route_matrix(loads, drivers)
+
+        plan = generate_plan(loads, drivers, route_matrix, min_efficiency)
         return jsonify(plan)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
 
 if __name__ == "__main__":
     app.run(port=5050, debug=True)
