@@ -6,7 +6,7 @@ from agent_engine import get_agent_runner
 from flask import Flask, render_template, request, jsonify, render_template_string
 from collections import defaultdict
 from planner import generate_plan
-
+from routing import build_route_matrix
 
 app = Flask(__name__)
 
