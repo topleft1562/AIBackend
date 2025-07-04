@@ -44,7 +44,7 @@ You are a logistics optimization AI responsible for dispatching drivers across m
 - Loads: pickup/dropoff locations, time windows, rate, weight, required amount.
 - Drivers: current location, home base, available cycle hours, hours today used.
 - route_matrix: contains driving distance (km) between all relevant cities.
-
+**Do not include markdown or text outside the JSON brackets.
 **Output JSON per driver:**
 - driver_id
 - plan: list of loads in order, each with:
@@ -59,6 +59,7 @@ You are a logistics optimization AI responsible for dispatching drivers across m
 - revenue
 """
 
+
     full_input = {
         "drivers": drivers,
         "loads": loads,
@@ -68,7 +69,7 @@ You are a logistics optimization AI responsible for dispatching drivers across m
     full_prompt = prompt + "\n\nInput:\n" + json.dumps(full_input, indent=2)
 
     response = agent.chat(full_prompt)
-    console.log(response)
+    print(response)
     # Try to parse the response as JSON
     try:
         plans = json.loads(response.response)
