@@ -188,6 +188,8 @@ function startAsyncDispatch(payload) {
     .then(res => res.json())
     .then(data => {
       const taskId = data.task_id;
+      document.getElementById("cancelButton").style.display = "inline";
+      document.querySelector("button[type='submit']").style.display = "none";
       pollTaskProgress(taskId);
     });
 }
@@ -209,6 +211,7 @@ async function cancelTask() {
   document.getElementById("output").innerHTML = "<div style='color:red;'>Task cancelled.</div>";
   document.getElementById("spinner").style.display = "none";
   document.getElementById("cancelButton").style.display = "none";
+  document.querySelector("button[type='submit']").style.display = "inline";
 }
 
 function addRouteBlock() {
@@ -413,6 +416,8 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
       body: JSON.stringify(payload),
     });
     const { task_id } = await res.json();
+    document.getElementById("cancelButton").style.display = "inline";
+    document.querySelector("button[type='submit']").style.display = "none";
     pollTaskProgress(task_id); // defined below
     return; // Exit early — everything else is handled via polling
   }
@@ -445,6 +450,8 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
 } finally {
   if (currentRouteMode !== "manual") {
     document.getElementById("spinner").style.display = "none";
+    document.querySelector("button[type='submit']").style.display = "inline";
+    document.getElementById("cancelButton").style.display = "none";
   }
 }
 });
