@@ -450,7 +450,7 @@ def dispatch_async():
                         raise Exception("Task cancelled")
                     TASKS[task_id]["progress"] = 30 + int(pct * 0.7)
                 hook.check_cancelled = lambda: TASKS[task_id].get("cancelled", False)
-            return hook 
+                return hook 
 
             # Calculate all qualifying routes
             routes = enumerate_qualifying_routes_threaded(
