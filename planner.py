@@ -1,7 +1,8 @@
 import json
-from agent_engine import agent
+from agent_engine import get_agent_runner
 from hos import simulate_driver_plan
 
+agent = get_agent_runner()
 
 def extract_gap_segments(plan, route_matrix):
     """
@@ -66,7 +67,7 @@ You are a logistics optimization AI responsible for dispatching drivers across m
 
     full_prompt = prompt + "\n\nInput:\n" + json.dumps(full_input, indent=2)
 
-    response = agent.stream_chat(full_prompt)
+    response = agent.chat(full_prompt)
 
     # Try to parse the response as JSON
     try:
