@@ -436,7 +436,8 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
 // ⬇️ Keep this outside the submit handler!
 function pollTaskProgress(taskId) {
   const spinner = document.getElementById("spinner");
-  spinner.innerHTML = "⏳ Processing... <span id='progressText'>0%</span>";
+  document.getElementById("progressText").innerText = "0%";
+  document.getElementById("progressBarFill").style.width = "0%";
 
   const interval = setInterval(async () => {
     const res = await fetch(`/task_status/${taskId}`);
@@ -456,7 +457,8 @@ function pollTaskProgress(taskId) {
 
     if (data.state === "error") {
       clearInterval(interval);
-      spinner.innerHTML = `<span style="color:red;">❌ Error: ${data.error}</span>`;
+      document.getElementById("output").innerHTML = `<span style="color:red;">❌ Error: ${data.error}</span>`;
+      spinner.style.display = "none";
     }
   }, 1000);
 }

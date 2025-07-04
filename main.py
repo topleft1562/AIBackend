@@ -231,6 +231,9 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
 
+from threading import Thread
+import uuid
+
 @app.route("/dispatch_async", methods=["POST"])
 def dispatch_async():
     data = request.json
@@ -239,30 +242,97 @@ def dispatch_async():
 
     def run_task():
         try:
-            # Update progress in-place:
             TASKS[task_id]["progress"] = 10
 
-            # Simulate long logic: call your existing route code
-            enriched_data = ...  # Build as before from data
-            # Optionally sleep or yield updates:
-            # time.sleep(2)
-            TASKS[task_id]["progress"] = 30
+            # Extract & normalize input
+            loads = data.get("loads", [])
+            start_location = normalize_city(data.get("start", "Brandon, MB"))
+            end_location = normalize_city(data.get("end", "Brandon, MB"))
+            loaded_pct_goal = float(data.get("loaded_pct_goal", 65)) / 100
+            max_chain_amount = int(data.get("max_chain_amount", 6))
 
-            # Process routes (example: enumerate_qualifying_routes)
+            for i, load in enumerate(loads):
+                load["load_id"] = i + 1
+                load["pickupCity"] = normalize_city(load["pickupCity"])
+                load["dropoffCity"] = normalize_city(load["dropoffCity"])
+                load["rate"] = float(load.get("rate", 0))
+                load["weight"] = float(load.get("weight", 0))
+                load["revenue"] = load["rate"] * load["weight"]
+
+            TASKS[task_id]["progress"] = 20
+
+            # Pre-fetch all needed distances
+            city_pairs = set()
+            for load in loads:
+                pickup = load["pickupCity"]
+                dropoff = load["dropoffCity"]
+                city_pairs.update({(start_location, pickup), (pickup, dropoff), (dropoff, end_location)})
+                for other in loads:
+                    city_pairs.add((dropoff, other["pickupCity"]))
+
+            origin_dest_map = defaultdict(set)
+            for origin, dest in city_pairs:
+                origin_dest_map[origin].add(dest)
+            for origin, dests in origin_dest_map.items():
+                get_distances_batch(origin, list(dests))
+
+            TASKS[task_id]["progress"] = 40
+
+            # Build enriched loads with reload options
+            result = []
+            for load in loads:
+                pickup = load["pickupCity"]
+                dropoff = load["dropoffCity"]
+                reload_options = {
+                    f"load_{other['load_id']}": {
+                        "pickup": other["pickupCity"],
+                        "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                        "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                    }
+                    for other in loads if other["load_id"] != load["load_id"]
+                }
+                result.append({
+                    "load_id": load["load_id"],
+                    "pickup": pickup,
+                    "dropoff": dropoff,
+                    "revenue": load["revenue"],
+                    "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
+                    "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
+                    "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end_location), 0),
+                    "reload_options": reload_options,
+                    "required": load.get("required", False),
+                })
+
+            enriched_data = {
+                "start_location": start_location,
+                "end_location": end_location,
+                "loads": result
+            }
+
+            TASKS[task_id]["progress"] = 60
+
+            # Calculate all qualifying routes
             routes = enumerate_qualifying_routes(
                 enriched_data,
-                loaded_pct_threshold=...,  # your logic
-                max_chain_amount=...
+                loaded_pct_threshold=loaded_pct_goal,
+                max_chain_amount=max_chain_amount
             )
-            TASKS[task_id]["progress"] = 90
 
+            TASKS[task_id]["progress"] = 100
             TASKS[task_id] = {"state": "complete", "progress": 100, "result": routes}
+
         except Exception as e:
-            TASKS[task_id] = {"state": "error", "error": str(e)}
+            import traceback
+            TASKS[task_id] = {
+                "state": "error",
+                "error": str(e),
+                "trace": traceback.format_exc()
+            }
 
     Thread(target=run_task).start()
     return jsonify({"task_id": task_id})
-    
+
+
 @app.route("/task_status/<task_id>")
 def task_status(task_id):
     task = TASKS.get(task_id)
