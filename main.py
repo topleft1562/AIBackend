@@ -5,6 +5,8 @@ from urllib.parse import unquote
 from agent_engine import get_agent_runner
 from flask import Flask, render_template, request, jsonify, render_template_string
 from collections import defaultdict
+from planner import generate_plan
+
 
 app = Flask(__name__)
 
@@ -528,6 +530,30 @@ def handle_manual_routes():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+@app.route("/ai_plan", methods=["POST"])
+def ai_plan():
+    try:
+        data = request.get_json()
+        loads = data.get("loads", [])
+        drivers = data.get("drivers", [])
+        min_efficiency = float(data.get("min_efficiency", 0.7))
+
+        if not loads or not drivers:
+            return jsonify({"error": "Missing loads or drivers"}), 400
+
+        plan = generate_plan(loads, drivers, min_efficiency)
+        return jsonify(plan)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(port=5050, debug=True)
+
+@app.route("/")
+def show_dispatch_form():
+    return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
 
 @app.route("/")
 def show_dispatch_form():

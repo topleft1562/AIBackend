@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Dispatch Planner</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, button, select { padding: 6px; margin-top: 5px; }
+    .load-row, .driver-row { display: flex; gap: 8px; margin-bottom: 10px; }
+    .section { border: 1px solid #ccc; padding: 15px; margin-top: 20px; border-radius: 8px; background: #f9f9f9; }
+    .section h3 { margin-top: 0; }
+    .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .results-table th, .results-table td { border: 1px solid #aaa; padding: 6px 10px; text-align: center; }
+    .results-table th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h2>AI Dispatch Planner</h2>
+
+  <form id="aiDispatchForm">
+    <div class="section">
+      <h3>Drivers</h3>
+      <div id="driversContainer"></div>
+      <button type="button" onclick="addDriverRow()">➕ Add Driver</button>
+    </div>
+
+    <div class="section">
+      <h3>Loads</h3>
+      <div id="loadsContainer"></div>
+      <button type="button" onclick="addLoadRow()">➕ Add Load</button>
+    </div>
+
+    <label>Min Efficiency (% Loaded): <input type="number" id="minEfficiency" value="70" min="50" max="100" /></label>
+    <br>
+    <button type="submit">Submit to AI</button>
+  </form>
+
+  <div id="results"></div>
+
+<script>
+function addDriverRow() {
+  const row = document.createElement('div');
+  row.className = 'driver-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Driver ID" required />
+    <input type="text" placeholder="Home Base" required />
+    <input type="text" placeholder="Current Location" required />
+    <input type="number" placeholder="Available Hours" required step="0.1" />
+    <input type="number" placeholder="Days Into Cycle" required />
+    <button type="button" onclick="this.parentElement.remove()">❌</button>
+  `;
+  document.getElementById('driversContainer').appendChild(row);
+}
+
+function addLoadRow() {
+  const row = document.createElement('div');
+  row.className = 'load-row';
+  row.innerHTML = `
+    <input type="text" placeholder="Pickup City" required />
+    <input type="datetime-local" placeholder="Pickup Start" required />
+    <input type="datetime-local" placeholder="Pickup End" required />
+    <input type="text" placeholder="Dropoff City" required />
+    <input type="datetime-local" placeholder="Dropoff Start" required />
+    <input type="datetime-local" placeholder="Dropoff End" required />
+    <input type="number" placeholder="Rate" required step="0.01" />
+    <input type="number" placeholder="Weight" required step="0.1" />
+    <input type="number" placeholder="Required Amount" value="1" min="1" />
+    <button type="button" onclick="this.parentElement.remove()">❌</button>
+  `;
+  document.getElementById('loadsContainer').appendChild(row);
+}
+
+// Submit handler
+
+const form = document.getElementById('aiDispatchForm');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const drivers = Array.from(document.querySelectorAll('.driver-row')).map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      id: inputs[0].value,
+      home_base: inputs[1].value,
+      location: inputs[2].value,
+      available_hours: parseFloat(inputs[3].value),
+      days_into_cycle: parseInt(inputs[4].value)
+    };
+  });
+  const loads = Array.from(document.querySelectorAll('.load-row')).map(row => {
+    const inputs = row.querySelectorAll('input');
+    return {
+      pickup: {
+        city: inputs[0].value,
+        window: { start: inputs[1].value, end: inputs[2].value }
+      },
+      dropoff: {
+        city: inputs[3].value,
+        window: { start: inputs[4].value, end: inputs[5].value }
+      },
+      rate: parseFloat(inputs[6].value),
+      weight: parseFloat(inputs[7].value),
+      required_amount: parseInt(inputs[8].value)
+    };
+  });
+  const min_eff = parseFloat(document.getElementById('minEfficiency').value) / 100;
+
+  const res = await fetch('/ai_plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ drivers, loads, min_efficiency: min_eff })
+  });
+
+  const output = await res.json();
+  renderResults(output);
+});
+
+function renderResults(data) {
+  const div = document.getElementById('results');
+  if (data.error) {
+    div.innerHTML = `<p style="color:red;">${data.error}</p>`;
+    return;
+  }
+  let html = '';
+  data.forEach(plan => {
+    html += `<h3>Driver ${plan.driver_id}</h3>`;
+    html += `<p>Efficiency: ${Math.round(plan.efficiency * 100)}% | Revenue: $${plan.revenue} | Total km: ${plan.total_km}</p>`;
+    html += `<ul>`;
+    plan.plan.forEach(l => {
+      html += `<li>${l.date}: ${l.from} → ${l.to} (${l.drive_hr}h)</li>`;
+    });
+    html += `</ul>`;
+    if (plan.gap_segments?.length) {
+      html += `<p style="color:#e53e3e">Gaps to Fill:</p><ul>`;
+      plan.gap_segments.forEach(g => {
+        html += `<li>${g.from} → ${g.to} = ${g.empty_km} km empty</li>`;
+      });
+      html += `</ul>`;
+    }
+  });
+  div.innerHTML = html;
+}
+</script>
+</body>
+</html>
