@@ -124,7 +124,7 @@ function renderResults(data) {
   let html = '';
   data.forEach(plan => {
     html += `<h3>Driver ${plan.driver_id}</h3>`;
-    html += `<p>Efficiency: ${Math.round(plan.efficiency * 100)}% | Revenue: $${plan.revenue} | Total km: ${plan.total_km}</p>`;
+    html += `<p>Efficiency: ${Math.round(plan.efficiency * 100)}% | Revenue: $${plan.revenue} | Total km: ${plan.total_km} | Empty km: ${plan.empty_km}</p>`;
     html += `<ul>`;
     plan.plan.forEach(l => {
       html += `<li>${l.date}: ${l.from} → ${l.to} (${l.drive_hr}h)</li>`;

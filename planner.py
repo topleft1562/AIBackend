@@ -57,6 +57,15 @@ You are a logistics optimization AI responsible for dispatching drivers across m
 - loaded_km
 - efficiency (loaded_km / total_km)
 - revenue
+
+Additional Constraints:
+- The driver must END the route at their home base, unless explicitly allowed to reset away from home.
+- Output total_km, loaded_km, and empty_km (so efficiency = loaded_km / total_km).
+- For each load, revenue = rate * weight.
+- Total revenue is the sum of all load revenues in the plan.
+- Calculate total drive time based on 80 km/h.
+- Include any repositioning (empty) legs in the plan with drive_hr and empty_km.
+
 """
 
 
@@ -79,22 +88,52 @@ You are a logistics optimization AI responsible for dispatching drivers across m
             "raw": response.response
         }
 
-    # Post-process each driver plan
+    # Add fallback revenue calc + empty km logic if LLM missed it
     for plan in plans:
+        plan["revenue"] = 0
+        plan["loaded_km"] = 0
+        plan["empty_km"] = 0
+        last_city = None
+
+        for leg in plan["plan"]:
+            # Calculate revenue per load if needed
+            load = next((l for l in loads if l["pickup"]["city"].lower() == leg["from"].lower()
+                        and l["dropoff"]["city"].lower() == leg["to"].lower()), None)
+            if load:
+                leg_revenue = load["rate"] * load["weight"]
+                plan["revenue"] += leg_revenue
+
+            # Use route_matrix for km
+            key = " | ".join(sorted([leg["from"].strip().title(), leg["to"].strip().title()]))
+            route = route_matrix.get(key)
+            if not route:
+                continue
+
+            plan["total_km"] = plan.get("total_km", 0) + route["distance_km"]
+
+            # Empty or loaded?
+            if last_city:
+                if leg["from"].lower() != last_city.lower():
+                    # There was an empty segment in between
+                    empty_key = " | ".join(sorted([last_city.strip().title(), leg["from"].strip().title()]))
+                    empty_route = route_matrix.get(empty_key)
+                    if empty_route:
+                        plan["empty_km"] += empty_route["distance_km"]
+                        plan["total_km"] += empty_route["distance_km"]
+
+            plan["loaded_km"] += route["distance_km"]
+            last_city = leg["to"]
+
+        # Final return to home?
         driver = next((d for d in drivers if d["id"] == plan["driver_id"]), None)
-        if not driver:
-            plan["hos_check"] = { "valid": False, "error": "Driver not found" }
-            continue
+        if driver and last_city and last_city.lower() != driver["home_base"].lower():
+            ret_key = " | ".join(sorted([last_city.strip().title(), driver["home_base"].strip().title()]))
+            ret_route = route_matrix.get(ret_key)
+            if ret_route:
+                plan["empty_km"] += ret_route["distance_km"]
+                plan["total_km"] += ret_route["distance_km"]
 
-        # Simulate HOS compliance
-        sim_result = simulate_driver_plan(plan, driver)
-        plan["hos_check"] = sim_result
+        plan["efficiency"] = plan["loaded_km"] / plan["total_km"] if plan["total_km"] else 0
 
-        # Check efficiency threshold
-        eff = plan.get("efficiency", 0)
-        plan["meets_efficiency_target"] = eff >= min_efficiency
 
-        # Extract empty segments between chained loads
-        plan["gap_segments"] = extract_gap_segments(plan, route_matrix)
-
-    return plans
+        return plans
