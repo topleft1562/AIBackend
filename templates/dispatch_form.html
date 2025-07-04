@@ -228,6 +228,15 @@ function addRouteBlock() {
       <select class="trip-select" onchange="handleTripSelect(this)" style="float:right; margin-left: 8px;"></select>
       <button type="button" onclick="clearSelectedTrip(this)" style="float:right;">Clear</button>
       <button type="button" onclick="deleteSelectedTrip(this)" style="float:right; margin-left: 8px; color:#e53e3e;">❌</button>
+
+      <!-- Excel Import -->
+      <div id="excelImportSection" style="margin: 10px 0;">
+        <label for="excelInput" style="cursor:pointer;">
+          📥 <strong>Import from Excel</strong>
+        </label>
+        <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
+      </div>
+
     </h3>
     <label>Start Location:</label>
     <input type="text" name="start" placeholder="Starting Point" required />
@@ -454,6 +463,21 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     document.getElementById("cancelButton").style.display = "none";
   }
 }
+});
+
+function updateImportVisibility() {
+  const importSection = document.getElementById("excelImportSection");
+  if (!importSection) return;
+  if (currentRouteMode === "direct") {
+    importSection.style.display = "none";
+  } else {
+    importSection.style.display = "block";
+  }
+}
+
+document.getElementById("routeMode").addEventListener("change", function () {
+  currentRouteMode = this.value;
+  updateImportVisibility();
 });
 
 // ⬇️ Keep this outside the submit handler!
