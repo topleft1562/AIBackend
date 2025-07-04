@@ -170,7 +170,8 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     progress_queue = Queue()
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps, local_results):
-        if len(path) > max_chain_amount:
+        if len(path) > 8:  # or 10, etc.
+            print(f"Pruned path at depth {len(path)} (ids: {[l['load_id'] for l in path]})")
             return
 
         if path:
