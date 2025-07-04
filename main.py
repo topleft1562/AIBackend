@@ -10,6 +10,7 @@ from routing import build_route_matrix
 from threading import Thread, Lock
 from queue import Queue
 import uuid
+import time
 
 app = Flask(__name__)
 
@@ -236,8 +237,14 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
         local_results = []
         total = len(load_subset)
         for i, load in enumerate(load_subset):
-            progress_queue.put((idx, int((i + 1) / total * 100)))
+            lid = load["load_id"]
+            print(f"[Thread {idx}] Starting load {lid} ({i+1}/{total})")
+            t0 = time.time()
             search([], set(), 0, 0, 0, [], local_results)
+            elapsed = time.time() - t0
+            if elapsed > 5:
+                print(f"[Thread {idx}] ⚠️ Load {lid} took {elapsed:.1f}s")
+            progress_queue.put((idx, int((i + 1) / total * 100)))
         with result_lock:
             results.extend(local_results)
         progress_queue.put((idx, 100))
