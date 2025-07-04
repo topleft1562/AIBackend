@@ -68,7 +68,7 @@ You are a logistics optimization AI responsible for dispatching drivers across m
     full_prompt = prompt + "\n\nInput:\n" + json.dumps(full_input, indent=2)
 
     response = agent.chat(full_prompt)
-
+    console.log(response)
     # Try to parse the response as JSON
     try:
         plans = json.loads(response.response)
