@@ -557,7 +557,7 @@ def show_dispatch_form():
 
 @app.route("/ai")
 def show_dispatch_form():
-    return render_template("dispatch_form.html", google_api_key=GOOGLE_KEY)
+    return render_template("ai_planner_form.html")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
