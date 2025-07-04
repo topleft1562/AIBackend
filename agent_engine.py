@@ -1,25 +1,21 @@
-import os
-from dotenv import load_dotenv
 from llama_index.llms.openai import OpenAI
-from llama_index.core.agent import FunctionCallingAgent
+from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import FunctionTool
 
-load_dotenv()
+llm = OpenAI(model="gpt-4.1")
 
-llm = OpenAI(
-    model="gpt-4.1",
+# Optional example function
+def get_distance(from_city: str, to_city: str) -> float:
+    return 100.0  # dummy value
+
+tools = [
+    FunctionTool.from_defaults(fn=get_distance)
+]
+
+agent = FunctionAgent(
+    tools=tools,
+    llm=llm,
+    system_prompt="You are Dispatchy, an expert logistics planner focused on maximizing efficiency.",
+    verbose=True
 )
-
-def get_agent_runner():
-    return FunctionCallingAgent.from_tools(
-        tools=[],  # No tools needed, just reasoning
-        llm=llm,
-        system_prompt=(
-            "You are Dispatchy, a highly efficient logistics planner for a trucking company. "
-            "You are an expert at reducing empty miles, optimizing driver assignments, and creating the most efficient routes possible with the provided load and route data. "
-            "Always prioritize minimizing empty distance and maximizing efficiency in your plans."
-        )
-    )
-
-    
 
