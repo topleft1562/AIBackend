@@ -54,6 +54,7 @@
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
+    <button id="cancelButton" onclick="cancelTask()" style="display:none;">Cancel</button>
   </form>
 
   <!-- Sorting toggle for manual mode -->
@@ -194,6 +195,21 @@ function startAsyncDispatch(payload) {
 let routeCount = 0;
 let currentRouteMode = "direct";
 let resultsCache = [];
+let currentTaskId = null;
+
+async function startDispatch() {
+  // after getting task_id:
+  currentTaskId = data.task_id;
+  document.getElementById("cancelButton").style.display = "inline";
+}
+
+async function cancelTask() {
+  if (!currentTaskId) return;
+  await fetch(`/cancel_task/${currentTaskId}`, { method: "POST" });
+  document.getElementById("output").innerHTML = "<div style='color:red;'>Task cancelled.</div>";
+  document.getElementById("spinner").style.display = "none";
+  document.getElementById("cancelButton").style.display = "none";
+}
 
 function addRouteBlock() {
   routeCount += 1;

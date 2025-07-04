@@ -170,6 +170,9 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     progress_queue = Queue()
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps, local_results):
+        if task_progress_hook and callable(getattr(task_progress_hook, "check_cancelled", None)):
+            if task_progress_hook.check_cancelled():
+                raise Exception("Task cancelled")
         if len(path) >= max_chain_amount:
             return
 
@@ -351,11 +354,24 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
 
+@app.route("/cancel_task/<task_id>", methods=["POST"])
+def cancel_task(task_id):
+    if task_id in TASKS and TASKS[task_id]["state"] == "in_progress":
+        TASKS[task_id]["cancelled"] = True
+        return jsonify({"status": "cancelled"})
+    return jsonify({"status": "not_found or already complete"}), 400
+
 @app.route("/dispatch_async", methods=["POST"])
 def dispatch_async():
     data = request.json
     task_id = str(uuid.uuid4())
-    TASKS[task_id] = {"state": "in_progress", "progress": 0, "result": None}
+    TASKS[task_id] = {
+        "state": "in_progress",
+        "progress": 0,
+        "result": None,
+        "cancelled": False
+    }
+
 
     def run_task():
         try:
@@ -428,13 +444,21 @@ def dispatch_async():
 
             TASKS[task_id]["progress"] = 30
 
+            def make_progress_hook(task_id):
+                def hook(pct):
+                    if TASKS[task_id].get("cancelled"):
+                        raise Exception("Task cancelled")
+                    TASKS[task_id]["progress"] = 30 + int(pct * 0.7)
+                hook.check_cancelled = lambda: TASKS[task_id].get("cancelled", False)
+            return hook 
+
             # Calculate all qualifying routes
             routes = enumerate_qualifying_routes_threaded(
                 enriched_data,
                 loaded_pct_threshold=loaded_pct_goal,
                 max_chain_amount=max_chain_amount,
                 num_threads=4,
-                task_progress_hook=lambda pct: TASKS.__setitem__(task_id, {**TASKS[task_id], "progress": 30 + int(pct * 0.7)})
+                task_progress_hook=make_progress_hook(task_id)
             )
 
             TASKS[task_id]["progress"] = 100
