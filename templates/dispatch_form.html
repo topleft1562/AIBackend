@@ -230,7 +230,7 @@ function addRouteBlock() {
       <button type="button" onclick="deleteSelectedTrip(this)" style="float:right; margin-left: 8px; color:#e53e3e;">❌</button>
 
       <!-- Excel Import -->
-      <div id="excelImportSection" style="margin: 10px 0;">
+      <div id="excelImportSection" style="margin: 10px 0; style="display:none;"">
         <label for="excelInput" style="cursor:pointer;">
           📥 <strong>Import from Excel</strong>
         </label>
@@ -361,6 +361,7 @@ function updateRouteUI() {
   }
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
+  document.getElementById("excelImportSection").style.display = (currentRouteMode === "direct") ? "block" : "none";
 }
 
 // --- SUBMIT HANDLER ---
@@ -465,20 +466,6 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
 }
 });
 
-function updateImportVisibility() {
-  const importSection = document.getElementById("excelImportSection");
-  if (!importSection) return;
-  if (currentRouteMode === "direct") {
-    importSection.style.display = "none";
-  } else {
-    importSection.style.display = "block";
-  }
-}
-
-document.getElementById("routeMode").addEventListener("change", function () {
-  currentRouteMode = this.value;
-  updateImportVisibility();
-});
 
 // ⬇️ Keep this outside the submit handler!
 function pollTaskProgress(taskId) {
