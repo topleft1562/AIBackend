@@ -227,22 +227,16 @@ function addRouteBlock() {
   routeDiv.innerHTML = `
     <h3>
       Route ${routeCount}
+
+      <div style="margin-bottom: 8px;">
+        <select class="trip-select" onchange="handleTripSelect(this)" style="margin-right: 6px;"></select>
+        <button type="button" onclick="saveThisRoute(this)">💾 Save</button>
+        <button type="button" onclick="clearSelectedTrip(this)">Clear</button>
+        <button type="button" onclick="deleteSelectedTrip(this)" style="color:#e53e3e;">❌</button>
+      </div>
+
       <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>
     </h3>
-
-    <div style="margin-bottom: 8px;">
-      <select class="trip-select" onchange="handleTripSelect(this)" style="margin-right: 6px;"></select>
-      <button type="button" onclick="saveThisRoute(this)">💾 Save</button>
-      <button type="button" onclick="clearSelectedTrip(this)">Clear</button>
-      <button type="button" onclick="deleteSelectedTrip(this)" style="color:#e53e3e;">❌</button>
-    </div>
-
-    <div class="excelImportSection" style="margin: 10px 0; display: none;">
-      <label for="excelInput" style="cursor:pointer;">
-        📥 <strong>Import from Excel</strong>
-      </label>
-      <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
-    </div>
 
     <label>Start Location:</label>
     <input type="text" name="start" placeholder="Starting Point" required />
