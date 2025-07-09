@@ -10,17 +10,14 @@
     input, button, select { padding: 5px; margin-top: 5px; }
     .route-block { border: 1px solid #aaa; padding: 16px; margin-bottom: 24px; background: #f9f9f9; border-radius: 7px; }
     .route-block h3 { margin: 0 0 10px 0; }
-    .load-row { margin-bottom: 10px; display: flex; align-items: center; }
+    .load-row { margin-bottom: 10px; display: flex; align-items: center; cursor: move; }
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
     .load-header span,
     .load-row input { min-width: 130px; max-width: 130px; width: 130px; margin-right: 0; text-align: left; }
     .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
     .load-row button { margin-left: 5px; min-width: 32px; }
-    #spinner { display: none; margin: 30px auto; text-align: center; }
-    #spinner svg { animation: spin 1s linear infinite; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    #addRouteBtn { display: inline-block; margin-bottom: 10px; }
+    .sortable-ghost { opacity: 0.4; background: #ddd; }
     .remove-route-btn { float: right; color: #e53e3e; display: inline; }
     .sort-toggle { margin-bottom: 10px; font-size: 16px; }
     .results-table { border-collapse: collapse; width: 100%; margin: 18px 0; background: #fff; }
@@ -30,9 +27,13 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
-  <!-- Dynamically loaded Google Maps API in JS below -->
+
+  <!-- 📦 Add SortableJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
+
+
   <h2>Dispatch Optimizer</h2>
   <form id="dispatchForm">
     <label for="routeMode">Route Type:</label>
@@ -315,6 +316,7 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
     <span></span>
   `;
   header.innerHTML = headerHtml;
+
   const loadsContainer = routeDiv.querySelector('.loadsContainer');
   const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
   const oldVals = rows.map(row => ({
@@ -328,6 +330,13 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
   loadsContainer.innerHTML = "";
   oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
   if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
+
+  if (currentRouteMode === "direct") {
+    Sortable.create(loadsContainer, {
+      animation: 150,
+      ghostClass: "sortable-ghost"
+    });
+  }
 }
 
 function updateRouteUI() {
@@ -345,7 +354,11 @@ function updateRouteUI() {
       startInput.setAttribute("required", "required");
       endInput.setAttribute("required", "required");
     }
+
+    const excelDiv = block.querySelector('.excelImportSection');
+    if (excelDiv) excelDiv.style.display = (currentRouteMode !== "direct") ? "block" : "none";
   });
+
   if (currentRouteMode === "direct") {
     addRouteBtn.style.display = "inline-block";
     const removeBtns = document.querySelectorAll('.remove-route-btn');
@@ -360,9 +373,9 @@ function updateRouteUI() {
     const removeBtns = document.querySelectorAll('.remove-route-btn');
     removeBtns.forEach(btn => btn.style.display = "none");
   }
+
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
-  document.getElementById("excelImportSection").style.display = (currentRouteMode !== "direct") ? "block" : "none";
 }
 
 // --- SUBMIT HANDLER ---
