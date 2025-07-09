@@ -227,16 +227,15 @@ function addRouteBlock() {
   routeDiv.innerHTML = `
     <h3>
       Route ${routeCount}
-
-      <div style="margin-bottom: 8px;">
-        <select class="trip-select" onchange="handleTripSelect(this)" style="margin-right: 6px;"></select>
-        <button type="button" onclick="saveThisRoute(this)">💾 Save</button>
-        <button type="button" onclick="clearSelectedTrip(this)">Clear</button>
-        <button type="button" onclick="deleteSelectedTrip(this)" style="color:#e53e3e;">❌</button>
-      </div>
-
       <button type="button" class="remove-route-btn" onclick="removeRouteBlock(this)">Remove Route</button>
     </h3>
+
+    <div style="margin-bottom: 8px;">
+      <select class="trip-select" onchange="handleTripSelect(this)" style="margin-right: 6px;"></select>
+      <button type="button" onclick="saveThisRoute(this)">💾 Save</button>
+      <button type="button" onclick="clearSelectedTrip(this)">Clear</button>
+      <button type="button" onclick="deleteSelectedTrip(this)" style="color:#e53e3e;">❌</button>
+    </div>
 
     <label>Start Location:</label>
     <input type="text" name="start" placeholder="Starting Point" required />
