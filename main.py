@@ -456,8 +456,42 @@ def dispatch_async():
                 task_progress_hook=make_progress_hook(task_id)
             )
 
-            TASKS[task_id]["progress"] = 100
-            TASKS[task_id] = {"state": "complete", "progress": 100, "result": routes}
+            # Cap to top 100 results and compute breakdowns
+            expanded = []
+            for idx, route in enumerate(routes[:100]):
+                trip_loads = []
+                for lid in route["load_ids"]:
+                    found = next((l for l in enriched_data["loads"] if l["load_id"] == lid), None)
+                    if found:
+                        trip_loads.append({
+                            "pickupCity": found["pickup"],
+                            "dropoffCity": found["dropoff"],
+                            "rate": found.get("rate", 0),
+                            "weight": found.get("weight", 0)
+                        })
+                trip_route = {
+                    "start": enriched_data["start_location"],
+                    "end": enriched_data["end_location"],
+                    "loads": trip_loads
+                }
+                summary, step_breakdown = compute_direct_route_info(trip_route)
+                route["summary"] = summary
+                route["step_breakdown"] = step_breakdown
+                route["loaded_km"] = summary["loaded_km"]
+                route["empty_km"] = summary["empty_km"]
+                route["total_km"] = summary["total_km"]
+                route["loaded_pct"] = summary["loaded_pct"]
+                route["revenue"] = summary["total_revenue"]
+                route["rpm"] = summary["rpm"]
+                route["hourly_rate"] = summary["hourly_rate"]
+                expanded.append(route)
+
+            TASKS[task_id] = {
+                "state": "complete",
+                "progress": 100,
+                "result": expanded
+            }
+
 
         except Exception as e:
             import traceback
