@@ -45,10 +45,20 @@
         Loaded % Goal:
         <input type="number" id="loadedPctGoal" value="70" min="1" max="100" step="1" />
       </label>
+  
       <label>
         Max Chain Length:
         <input type="number" id="maxChainLength" value="5" min="1" max="20" step="1" />
       </label>
+
+      <!-- Excel Import -->
+      <div style="margin: 10px 0;">
+        <label for="excelInput" style="cursor:pointer;">
+          📥 <strong>Import from Excel</strong>
+        </label>
+        <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
+      </div>
+
     </div>
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
@@ -66,13 +76,7 @@
     </label>
   </div>
 
-  <!-- Excel Import -->
-  <div style="margin: 10px 0;">
-    <label for="excelInput" style="cursor:pointer;">
-      📥 <strong>Import from Excel</strong>
-    </label>
-    <input type="file" id="excelInput" accept=".xlsx" style="display:none;" />
-  </div>
+  
 
 <div id="spinner" style="display:none; text-align:center; margin-top:20px;">
   <!-- Progress Bar -->
