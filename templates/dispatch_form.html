@@ -362,7 +362,7 @@ function updateRouteUI() {
   }
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
-  document.getElementById("excelImportSection").style.display = (currentRouteMode === "direct") ? "block" : "none";
+  document.getElementById("excelImportSection").style.display = (currentRouteMode !== "direct") ? "block" : "none";
 }
 
 // --- SUBMIT HANDLER ---
