@@ -27,8 +27,6 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
-
-  <!-- 📦 Add SortableJS -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
@@ -376,7 +374,12 @@ function updateRouteUI() {
 
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
+
+  // Always show save/load buttons (no matter what mode)
+  const tripControls = document.querySelectorAll('.trip-select, [onclick*="saveThisRoute"], [onclick*="clearSelectedTrip"], [onclick*="deleteSelectedTrip"]');
+  tripControls.forEach(el => el.style.display = 'inline-block');
 }
+
 
 // --- SUBMIT HANDLER ---
 document.getElementById("dispatchForm").addEventListener("submit", async function (e) {
