@@ -44,11 +44,11 @@
     <div class="settings-block" id="extraSettings" style="display:none;">
       <label>
         Loaded % Goal:
-        <input type="number" id="loadedPctGoal" value="65" min="1" max="100" step="1" />
+        <input type="number" id="loadedPctGoal" value="70" min="1" max="100" step="1" />
       </label>
       <label>
         Max Chain Length:
-        <input type="number" id="maxChainLength" value="6" min="1" max="20" step="1" />
+        <input type="number" id="maxChainLength" value="5" min="1" max="20" step="1" />
       </label>
     </div>
     <div id="routesContainer"></div>
@@ -410,8 +410,8 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   }
 
   // Get extra settings if relevant
-  let loadedPctGoal = Number(document.getElementById("loadedPctGoal")?.value || 65);
-  let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 6);
+  let loadedPctGoal = Number(document.getElementById("loadedPctGoal")?.value || 70);
+  let maxChainLength = Number(document.getElementById("maxChainLength")?.value || 5);
 
   try {
   let endpoint, payload;
@@ -573,7 +573,7 @@ function plotGoogleRouteMap(steps, mapId) {
 
 function renderResultsTable(routes) {
   if (!routes.length) {
-    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 65%+ loaded km.</div>";
+    document.getElementById("output").innerHTML = "<div style='color:#e53e3e'>No routes found with 70%+ loaded km.</div>";
     return;
   }
   let sortBy = document.getElementById("sortToggle").value;
