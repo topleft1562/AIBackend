@@ -159,7 +159,7 @@ def compute_direct_route_info(route, route_num=1):
     }
     return summary, steps
 
-def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=4, task_progress_hook=None):
+def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
    
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
