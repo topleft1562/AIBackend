@@ -54,7 +54,7 @@
     <div id="routesContainer"></div>
     <button type="button" id="addRouteBtn" onclick="addRouteBlock()">➕ Add Route</button><br><br>
     <button type="submit">Submit</button>
-    <button id="cancelButton" onclick="cancelTask()" style="display:none;">Cancel</button>
+    <button type="button" id="cancelButton" onclick="cancelTask()" style="display:none;">Cancel</button>
   </form>
 
   <!-- Sorting toggle for manual mode -->
@@ -212,6 +212,7 @@ async function cancelTask() {
   document.getElementById("spinner").style.display = "none";
   document.getElementById("cancelButton").style.display = "none";
   document.querySelector("button[type='submit']").style.display = "inline";
+  document.querySelector("button[type='submit']").disabled = false;
 }
 
 function addRouteBlock() {
@@ -369,6 +370,7 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   e.preventDefault();
   document.getElementById("output").innerHTML = "";
   document.getElementById("spinner").style.display = "block";
+  document.querySelector("button[type='submit']").disabled = true;
   resultsCache = [];
   // Collect route blocks
   const routeBlocks = document.querySelectorAll('.route-block');
@@ -461,6 +463,7 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   if (currentRouteMode !== "manual") {
     document.getElementById("spinner").style.display = "none";
     document.querySelector("button[type='submit']").style.display = "inline";
+    document.querySelector("button[type='submit']").disabled = false;
     document.getElementById("cancelButton").style.display = "none";
   }
 }
@@ -486,6 +489,7 @@ function pollTaskProgress(taskId) {
       clearInterval(interval);
       spinner.style.display = "none";
       document.querySelector("button[type='submit']").style.display = "inline-block";
+      document.querySelector("button[type='submit']").disabled = false;
       document.getElementById("cancelButton").style.display = "none";
       resultsCache = Array.isArray(data.result) ? data.result : [];
       renderResultsTable(resultsCache);

@@ -160,6 +160,7 @@ def compute_direct_route_info(route, route_num=1):
     return summary, steps
 
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=4, task_progress_hook=None):
+   
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -169,6 +170,13 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     result_lock = Lock()
     progress_queue = Queue()
 
+    task_queue = Queue()
+    for load in loads:
+        task_queue.put(load)
+
+    total_tasks = task_queue.qsize()
+    progress_done = 0
+
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps, local_results):
         if task_progress_hook and callable(getattr(task_progress_hook, "check_cancelled", None)):
             if task_progress_hook.check_cancelled():
@@ -176,31 +184,30 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
         if len(path) >= max_chain_amount:
             return
 
-        if path:
-            total_km = loaded_km + empty_km + path[-1]["return_km"]
-            loaded_pct = loaded_km / total_km if total_km else 0
-            route_ids = {l["load_id"] for l in path}
-            if loaded_pct >= loaded_pct_threshold and (not required_ids or required_ids.issubset(route_ids)):
-                seq = city_steps + [f"<span style='color:red'>{end}</span>"]
-                total_miles = total_km * 0.621371
-                rpm = (revenue / total_miles) if total_miles else 0
-                local_results.append({
-                    "city_sequence": " → ".join(seq),
-                    "load_ids": [l["load_id"] for l in path],
-                    "loaded_km": round(loaded_km, 1),
-                    "empty_km": round(empty_km + path[-1]["return_km"], 1),
-                    "loaded_pct": round(loaded_pct * 100, 1),
-                    "total_km": round(total_km, 1),
-                    "revenue": round(revenue, 2),
-                    "rpm": round(rpm, 2),
-                    "step_breakdown": []
-                })
+        total_km = loaded_km + empty_km + path[-1]["return_km"]
+        loaded_pct = loaded_km / total_km if total_km else 0
+        route_ids = {l["load_id"] for l in path}
+        if loaded_pct >= loaded_pct_threshold and (not required_ids or required_ids.issubset(route_ids)):
+            seq = city_steps + [f"<span style='color:red'>{end}</span>"]
+            total_miles = total_km * 0.621371
+            rpm = (revenue / total_miles) if total_miles else 0
+            local_results.append({
+                "city_sequence": " → ".join(seq),
+                "load_ids": [l["load_id"] for l in path],
+                "loaded_km": round(loaded_km, 1),
+                "empty_km": round(empty_km + path[-1]["return_km"], 1),
+                "loaded_pct": round(loaded_pct * 100, 1),
+                "total_km": round(total_km, 1),
+                "revenue": round(revenue, 2),
+                "rpm": round(rpm, 2),
+                "step_breakdown": []
+            })
 
-            remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
-            possible_total = loaded_km + remaining_loaded
-            possible_km = total_km + remaining_loaded
-            if possible_km and (possible_total / possible_km < loaded_pct_threshold):
-                return
+        remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
+        possible_total = loaded_km + remaining_loaded
+        possible_km = total_km + remaining_loaded
+        if possible_km and (possible_total / possible_km < loaded_pct_threshold):
+            return
 
         remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
         remaining_required = required_ids - set([l["load_id"] for l in path])
@@ -211,71 +218,59 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             lid = load["load_id"]
             if lid in used_ids:
                 continue
-            if not path:
-                new_empty = load["deadhead_km"]
-                new_loaded = load["loaded_km"]
-                new_revenue = load.get("revenue", 0.0)
-                new_steps = [
+            prev = path[-1]
+            reload_info = prev["reload_options"].get(f"load_{lid}")
+            if not reload_info:
+                continue
+            new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
+            new_loaded = loaded_km + load["loaded_km"]
+            new_revenue = revenue + load.get("revenue", 0.0)
+            new_steps = city_steps + [
+                f"<span style='color:blue'>{load['pickup']}</span>",
+                f"<span style='color:red'>{load['dropoff']}</span>",
+            ]
+            search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
+
+    def worker():
+        while not task_queue.empty():
+            try:
+                load = task_queue.get_nowait()
+            except:
+                break
+            lid = load["load_id"]
+            local_results = []
+            try:
+                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], [
                     f"<span style='color:green'>{start}</span>",
                     f"<span style='color:blue'>{load['pickup']}</span>",
                     f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
-                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
-            else:
-                prev = path[-1]
-                reload_key = f"load_{lid}"
-                reload_info = prev["reload_options"].get(reload_key)
-                if not reload_info:
-                    continue
-                new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
-                new_loaded = loaded_km + load["loaded_km"]
-                new_revenue = revenue + load.get("revenue", 0.0)
-                new_steps = city_steps + [
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
-                search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
+                ], local_results)
+                with result_lock:
+                    results.extend(local_results)
+            except Exception as e:
+                print(f"[Worker] Load {lid} failed: {e}")
+            finally:
+                progress_queue.put(1)
 
-    def thread_func(load_subset, idx):
-        local_results = []
-        total = len(load_subset)
-        for i, load in enumerate(load_subset):
-            lid = load["load_id"]
-            print(f"[Thread {idx}] Starting load {lid} ({i+1}/{total})")
-            t0 = time.time()
-            search([], set(), 0, 0, 0, [], local_results)
-            elapsed = time.time() - t0
-            if elapsed > 5:
-                print(f"[Thread {idx}] ⚠️ Load {lid} took {elapsed:.1f}s")
-            progress_queue.put((idx, int((i + 1) / total * 100)))
-        with result_lock:
-            results.extend(local_results)
-        progress_queue.put((idx, 100))
-
-    chunk_size = max(1, len(loads) // num_threads)
-    threads = []
-    for i in range(num_threads):
-        chunk = loads[i * chunk_size:(i + 1) * chunk_size] if i < num_threads - 1 else loads[i * chunk_size:]
-        t = Thread(target=thread_func, args=(chunk, i))
-        threads.append(t)
+    threads = [Thread(target=worker) for _ in range(num_threads)]
+    for t in threads:
         t.start()
 
-    thread_progress = [0] * num_threads
     while any(t.is_alive() for t in threads):
         while not progress_queue.empty():
-            idx, pct = progress_queue.get()
-            thread_progress[idx] = pct
-        total_pct = sum(thread_progress) // num_threads
-        if task_progress_hook:
-            task_progress_hook(total_pct)
-        else:
-            print(f"Progress: {total_pct}%", end="\r")
+            progress_done += progress_queue.get()
+            pct = int(progress_done / total_tasks * 100)
+            if task_progress_hook:
+                task_progress_hook(pct)
+            else:
+                print(f"Progress: {pct}%")
 
     for t in threads:
         t.join()
 
     results.sort(key=lambda r: (-r["loaded_pct"], -r["revenue"]))
     return results
+
 
 
 def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6):
