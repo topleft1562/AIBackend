@@ -73,7 +73,7 @@ def compute_direct_route_info(route, route_num=1):
     num_loaded_legs = 0
 
     if loads:
-        # Empty: Start -> first pickup
+        # Empty: Start → first pickup
         first_pickup = normalize_city(loads[0]["pickupCity"])
         empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
         empty_km += empty_to_first
@@ -86,31 +86,43 @@ def compute_direct_route_info(route, route_num=1):
             "revenue": "-",
             "rpm": "0.00"
         })
-        # Loaded and empty between loads
+
         for i, load in enumerate(loads):
             pickup = normalize_city(load["pickupCity"])
             dropoff = normalize_city(load["dropoffCity"])
-            rate = float(load.get("rate", 0))
-            weight = float(load.get("weight", 0))
-            revenue = rate * weight
-            dist = DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0)
+            route_points = [normalize_city(p) for p in load.get("routePoints", [])]
+
+            rate = load.get("rate", "-")
+            weight = load.get("weight", "-")
+            revenue = load.get("revenue", 0.0)
+
+            # Build city list: pickup → [route points] → dropoff
+            cities = [pickup] + route_points + [dropoff]
+            segment_label = " → ".join(cities)
+
+            dist = 0
+            for j in range(len(cities) - 1):
+                dist += DISTANCE_CACHE.get(get_distance_key(cities[j], cities[j + 1]), 0)
+
             loaded_km += dist
             total_revenue += revenue
             num_loaded_legs += 1
             miles = dist * 0.621371
             rpm = (revenue / miles) if miles else 0
+
             steps.append({
                 "type": "loaded",
-                "segment": f"{pickup} → {dropoff}",
-                "kms": dist,
+                "segment": segment_label,
+                "kms": round(dist, 1),
                 "rate": rate,
                 "weight": weight,
                 "revenue": revenue,
                 "rpm": f"{rpm:.2f}"
             })
-            # Empty between this drop and next pickup (if not last)
+
+            # Empty between this dropoff and next pickup
             if i < len(loads) - 1:
-                next_pickup = normalize_city(loads[i+1]["pickupCity"])
+                next_pickup = normalize_city(loads[i + 1]["pickupCity"])
                 deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
                 empty_km += deadhead
                 steps.append({
@@ -122,7 +134,8 @@ def compute_direct_route_info(route, route_num=1):
                     "revenue": "-",
                     "rpm": "0.00"
                 })
-        # Empty: Last drop -> end
+
+        # Final empty: last dropoff → end
         last_drop = normalize_city(loads[-1]["dropoffCity"])
         empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
         empty_km += empty_back
@@ -159,8 +172,8 @@ def compute_direct_route_info(route, route_num=1):
     }
     return summary, steps
 
+
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
-   
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -169,8 +182,8 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     results = []
     result_lock = Lock()
     progress_queue = Queue()
-
     task_queue = Queue()
+
     for load in loads:
         task_queue.put(load)
 
@@ -181,6 +194,7 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
         if task_progress_hook and callable(getattr(task_progress_hook, "check_cancelled", None)):
             if task_progress_hook.check_cancelled():
                 raise Exception("Task cancelled")
+
         if len(path) >= max_chain_amount:
             return
 
@@ -225,10 +239,14 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
             new_loaded = loaded_km + load["loaded_km"]
             new_revenue = revenue + load.get("revenue", 0.0)
-            new_steps = city_steps + [
-                f"<span style='color:blue'>{load['pickup']}</span>",
-                f"<span style='color:red'>{load['dropoff']}</span>",
-            ]
+
+            step_cities = [f"<span style='color:blue'>{load['pickup']}</span>"]
+            for rp in load.get("routePoints", []):
+                step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
+            step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
+
+            new_steps = city_steps + step_cities
+
             search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
 
     def worker():
@@ -240,11 +258,16 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             lid = load["load_id"]
             local_results = []
             try:
-                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], [
+                step_cities = [
                     f"<span style='color:green'>{start}</span>",
                     f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ], local_results)
+                ]
+                for rp in load.get("routePoints", []):
+                    step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
+                step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
+
+                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], step_cities, local_results)
+
                 with result_lock:
                     results.extend(local_results)
             except Exception as e:
@@ -272,7 +295,6 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     return results
 
 
-
 def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6):
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
@@ -281,9 +303,9 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
     required_ids = {load["load_id"] for load in loads if load.get("required")}
 
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps):
-        # Prune by max chain length
         if len(path) > max_chain_amount:
             return
+
         if path:
             total_km = loaded_km + empty_km + path[-1]["return_km"]
             loaded_pct = loaded_km / total_km if total_km else 0
@@ -303,14 +325,17 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
                     "rpm": round(rpm, 2),
                     "step_breakdown": []
                 })
-            # Prune if max possible loaded pct is now below threshold
-            remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
+
+            remaining_loaded = sum(
+                get_loaded_distance_with_routepoints(
+                    l["pickup"], l.get("routePoints", []), l["dropoff"]
+                ) for l in loads if l["load_id"] not in used_ids
+            )
             possible_total = loaded_km + remaining_loaded
             possible_km = total_km + remaining_loaded
             if possible_km and (possible_total / possible_km < loaded_pct_threshold):
                 return
 
-        # --- EARLY PRUNE for required loads ---
         remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
         remaining_required = required_ids - set([l["load_id"] for l in path])
         if len(remaining_unused) < len(remaining_required):
@@ -320,16 +345,19 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
             lid = load["load_id"]
             if lid in used_ids:
                 continue
+
             if not path:
                 new_empty = load["deadhead_km"]
-                new_loaded = load["loaded_km"]
+                new_loaded = get_loaded_distance_with_routepoints(
+                    load["pickup"], load.get("routePoints", []), load["dropoff"]
+                )
                 new_revenue = load.get("revenue", 0.0)
-                new_steps = [
-                    f"<span style='color:green'>{start}</span>",
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
-                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
+                step_cities = [f"<span style='color:green'>{start}</span>"]
+                step_cities.append(f"<span style='color:blue'>{load['pickup']}</span>")
+                for rp in load.get("routePoints", []):
+                    step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
+                step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
+                search([load], used_ids | {lid}, new_loaded, new_empty, new_revenue, step_cities)
             else:
                 prev = path[-1]
                 reload_key = f"load_{lid}"
@@ -337,12 +365,15 @@ def enumerate_qualifying_routes(enriched_data, loaded_pct_threshold=0.65, max_ch
                 if not reload_info:
                     continue
                 new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
-                new_loaded = loaded_km + load["loaded_km"]
+                new_loaded = loaded_km + get_loaded_distance_with_routepoints(
+                    load["pickup"], load.get("routePoints", []), load["dropoff"]
+                )
                 new_revenue = revenue + load.get("revenue", 0.0)
-                new_steps = city_steps + [
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ]
+                step_cities = [f"<span style='color:blue'>{load['pickup']}</span>"]
+                for rp in load.get("routePoints", []):
+                    step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
+                step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
+                new_steps = city_steps + step_cities
                 search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps)
 
     search([], set(), 0, 0, 0, [])
@@ -383,6 +414,7 @@ def dispatch_async():
                 load["load_id"] = i + 1
                 load["pickupCity"] = normalize_city(load["pickupCity"])
                 load["dropoffCity"] = normalize_city(load["dropoffCity"])
+                load["routePoints"] = [normalize_city(p) for p in load.get("routePoints", [])]
                 load["rate"] = float(load.get("rate", 0))
                 load["weight"] = float(load.get("weight", 0))
                 load["revenue"] = load["rate"] * load["weight"]
@@ -394,7 +426,13 @@ def dispatch_async():
             for load in loads:
                 pickup = load["pickupCity"]
                 dropoff = load["dropoffCity"]
-                city_pairs.update({(start_location, pickup), (pickup, dropoff), (dropoff, end_location)})
+                route_points = load.get("routePoints", [])
+                cities = [pickup] + route_points + [dropoff]
+
+                city_pairs.add((start, pickup))
+                for i in range(len(cities) - 1):
+                    city_pairs.add((cities[i], cities[i + 1]))
+                city_pairs.add((dropoff, end))
                 for other in loads:
                     city_pairs.add((dropoff, other["pickupCity"]))
 
@@ -415,7 +453,10 @@ def dispatch_async():
                     f"load_{other['load_id']}": {
                         "pickup": other["pickupCity"],
                         "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                        "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                        "loaded_km": sum(
+                            DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
+                            for i in range(len(cities) - 1)
+                        )   
                     }
                     for other in loads if other["load_id"] != load["load_id"]
                 }
@@ -534,6 +575,7 @@ def handle_dispatch():
             load["load_id"] = i + 1
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            load["routePoints"] = [normalize_city(p) for p in load.get("routePoints", [])]
             load["rate"] = float(load.get("rate", 0))
             load["weight"] = float(load.get("weight", 0))
             load["revenue"] = load["rate"] * load["weight"]
@@ -542,9 +584,13 @@ def handle_dispatch():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            city_pairs.update({(start, pickup), (pickup, dropoff), (dropoff, end)})
-            for other in loads:
-                city_pairs.add((dropoff, other["pickupCity"]))
+            route_points = load.get("routePoints", [])
+            cities = [pickup] + route_points + [dropoff]
+
+            city_pairs.add((start, pickup))
+            for i in range(len(cities) - 1):
+                city_pairs.add((cities[i], cities[i + 1]))
+            city_pairs.add((dropoff, end))
 
         origin_dest_map = defaultdict(set)
         for origin, dest in city_pairs:
@@ -560,7 +606,10 @@ def handle_dispatch():
                 f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
                     "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                    "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                    "loaded_km": sum(
+                        DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
+                        for i in range(len(cities) - 1)
+                    )  
                 }
                 for other in loads if other["load_id"] != load["load_id"]
             }
@@ -725,6 +774,7 @@ def handle_manual_routes():
             load["load_id"] = i + 1
             load["pickupCity"] = normalize_city(load["pickupCity"])
             load["dropoffCity"] = normalize_city(load["dropoffCity"])
+            load["routePoints"] = [normalize_city(p) for p in load.get("routePoints", [])]
             load["rate"] = float(load.get("rate", 0))
             load["weight"] = float(load.get("weight", 0))
             load["revenue"] = load["rate"] * load["weight"]
@@ -733,7 +783,14 @@ def handle_manual_routes():
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            city_pairs.update({(start, pickup), (pickup, dropoff), (dropoff, end)})
+            route_points = load.get("routePoints", [])
+            cities = [pickup] + route_points + [dropoff]
+
+            city_pairs.add((start, pickup))
+            for i in range(len(cities) - 1):
+                city_pairs.add((cities[i], cities[i + 1]))
+            city_pairs.add((dropoff, end))
+
             for other in loads:
                 city_pairs.add((dropoff, other["pickupCity"]))
 
@@ -751,7 +808,10 @@ def handle_manual_routes():
                 f"load_{other['load_id']}": {
                     "pickup": other["pickupCity"],
                     "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                    "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
+                    "loaded_km": sum(
+                        DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
+                        for i in range(len(cities) - 1)
+                    )  
                 }
                 for other in loads if other["load_id"] != load["load_id"]
             }

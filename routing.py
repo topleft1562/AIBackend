@@ -78,7 +78,11 @@ def build_route_matrix(loads, drivers):
     for load in loads:
         pickup = load["pickup"]["city"]
         dropoff = load["dropoff"]["city"]
-        unique_pairs.add(_make_cache_key(pickup, dropoff))
+        route_points = load.get("routePoints", [])
+
+        cities = [pickup] + route_points + [dropoff]
+        for i in range(len(cities) - 1):
+            unique_pairs.add(_make_cache_key(cities[i], cities[i+1]))
 
     # Driver repositioning: current → pickup, dropoff → home_base
     for driver in drivers:
@@ -102,3 +106,25 @@ def build_route_matrix(loads, drivers):
 
     return route_matrix
 
+def get_loaded_distance_with_routepoints(pickup, route_points, dropoff):
+    """
+    Compute the total distance from pickup → route_point(s) → dropoff.
+    Falls back to pickup → dropoff if no route points.
+    """
+    if not route_points:
+        info = get_route_info(pickup, dropoff)
+        return info["distance_km"] if info else 0
+
+    points = [pickup] + route_points + [dropoff]
+    total_km = 0
+    for i in range(len(points) - 1):
+        info = get_route_info(points[i], points[i + 1])
+        if info:
+            total_km += info["distance_km"]
+        else:
+            print(f"[ROUTEPOINT ERROR] Missing distance from {points[i]} → {points[i+1]}")
+    return round(total_km, 1)
+
+def get_route_segments(pickup, route_points, dropoff):
+    points = [pickup] + route_points + [dropoff]
+    return [(points[i], points[i+1]) for i in range(len(points) - 1)]

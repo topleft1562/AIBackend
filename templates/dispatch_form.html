@@ -281,6 +281,18 @@ function addLoadRow(routeBtn) {
 function addLoadRowWithValues(loadsContainer, values) {
   const mode = currentRouteMode;
   const row = document.createElement('div');
+  const routePoints = values.routePoints || [];
+  setTimeout(() => {
+    const container = row.querySelector('.routepoints-container');
+    routePoints.forEach(point => {
+      const dummyBtn = document.createElement("button");
+      addRoutePoint(dummyBtn); // call it as if button was clicked
+      const lastInput = container.querySelectorAll("input[name='routePoint']");
+      if (lastInput.length) {
+        lastInput[lastInput.length - 1].value = point;
+      }
+    });
+  }, 0);
   row.className = "load-row";
 
   let buttonsHTML = `<button type="button" onclick="removeLoadRow(this)">❌</button>`;
@@ -294,6 +306,8 @@ function addLoadRowWithValues(loadsContainer, values) {
 
   row.innerHTML = `
     <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+    <div class="routepoints-container" style="display:inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 6px;"></div>
+    <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
     <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
     ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
     <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
@@ -305,8 +319,32 @@ function addLoadRowWithValues(loadsContainer, values) {
   loadsContainer.appendChild(row);
 }
 
+
+
 function removeLoadRow(btn) {
   btn.parentElement.remove();
+}
+
+function addRoutePoint(button) {
+  const container = button.parentElement.querySelector(".routepoints-container");
+
+  const wrapper = document.createElement("div");
+  wrapper.style = "display:inline-flex; align-items:center; gap:4px;";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.name = "routePoint";
+  input.placeholder = "Route Point";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.innerText = "❌";
+  removeBtn.style = "margin-left: 4px; color: red;";
+  removeBtn.onclick = () => wrapper.remove();
+
+  wrapper.appendChild(input);
+  wrapper.appendChild(removeBtn);
+  container.appendChild(wrapper);
 }
 
 function updateRouteNumbers() {
@@ -454,9 +492,13 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
       const rate = parseFloat(rates[i].value);
       const weight = parseFloat(weights[i].value);
       const required = isManualMode && requireds[i] ? requireds[i].checked : false;
+      const routePoints = Array.from(pickups[i].closest('.load-row').querySelectorAll("input[name='routePoint']"))
+        .map(input => input.value.trim())
+        .filter(Boolean);
       for (let j = 0; j < count; j++) {
-        loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required });
+        loads.push({ pickupCity: pickup, dropoffCity: dropoff, rate, weight, required, routePoints });
       }
+      
     }
     if (currentRouteMode === "direct") {
       if (!start && loads.length) {
@@ -766,14 +808,21 @@ function saveThisRoute(btn) {
 
   const start = routeDiv.querySelector("input[name='start']").value.trim();
   const end = routeDiv.querySelector("input[name='end']").value.trim();
-  const loads = Array.from(routeDiv.querySelectorAll(".load-row")).map(row => ({
-    pickup: row.querySelector("input[name='pickup']").value,
-    dropoff: row.querySelector("input[name='dropoff']").value,
-    rate: row.querySelector("input[name='rate']").value,
-    weight: row.querySelector("input[name='weight']").value,
-    count: row.querySelector("input[name='count']")?.value || "1",
-    required: row.querySelector("input[name='required']")?.checked || false
-  }));
+  const loads = Array.from(routeDiv.querySelectorAll(".load-row")).map(row => {
+    const routePoints = Array.from(row.querySelectorAll("input[name='routePoint']"))
+      .map(r => r.value.trim())
+      .filter(Boolean);
+    return {
+      pickup: row.querySelector("input[name='pickup']").value,
+      dropoff: row.querySelector("input[name='dropoff']").value,
+      rate: row.querySelector("input[name='rate']").value,
+      weight: row.querySelector("input[name='weight']").value,
+      count: row.querySelector("input[name='count']")?.value || "1",
+      required: row.querySelector("input[name='required']")?.checked || false,
+      routePoints
+    };
+  });
+
   const saveObj = { start, end, loads };
   allSaves[name] = saveObj;
   localStorage.setItem("savedTrips", JSON.stringify(allSaves));
@@ -781,6 +830,7 @@ function saveThisRoute(btn) {
   select.value = name;
   alert(`Trip "${name}" saved!`);
 }
+
 
 function handleTripSelect(selectEl) {
   const name = selectEl.value;
