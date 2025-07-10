@@ -92,11 +92,11 @@ def compute_direct_route_info(route, route_num=1):
             dropoff = normalize_city(load["dropoffCity"])
             route_points = [normalize_city(p) for p in load.get("routePoints", [])]
 
-            rate = float(load.get("rate") or 0)
-            weight = float(load.get("weight") or 0)
-            load_revenue = rate * weight
-            total_revenue += load_revenue
+            rate = load.get("rate", "-")
+            weight = load.get("weight", "-")
+            revenue = rate * weight
 
+            # Build city list: pickup → [route points] → dropoff
             cities = [pickup] + route_points + [dropoff]
             segment_label = " → ".join(cities)
 
@@ -105,8 +105,10 @@ def compute_direct_route_info(route, route_num=1):
                 dist += DISTANCE_CACHE.get(get_distance_key(cities[j], cities[j + 1]), 0)
 
             loaded_km += dist
-            rpm = (load_revenue / dist) if dist else 0
+            total_revenue += revenue
             num_loaded_legs += 1
+            miles = dist * 0.621371
+            rpm = (revenue / miles) if miles else 0
 
             steps.append({
                 "type": "loaded",
@@ -114,10 +116,11 @@ def compute_direct_route_info(route, route_num=1):
                 "kms": round(dist, 1),
                 "rate": rate,
                 "weight": weight,
-                "revenue": round(load_revenue, 2),
-                "rpm": rpm
+                "revenue": revenue,
+                "rpm": f"{rpm:.2f}"
             })
 
+            # Empty between this dropoff and next pickup
             if i < len(loads) - 1:
                 next_pickup = normalize_city(loads[i + 1]["pickupCity"])
                 deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
@@ -167,9 +170,7 @@ def compute_direct_route_info(route, route_num=1):
         "rpm": round(rpm, 2),
         "hourly_rate": round(hourly_rate, 2)
     }
-
     return summary, steps
-
 
 
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
