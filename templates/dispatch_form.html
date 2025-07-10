@@ -34,7 +34,6 @@
   <form id="dispatchForm">
     <label for="routeMode">Route Type:</label>
     <select id="routeMode" name="routeMode">
-      <option value="best">Best Route (AI Optimized)</option>
       <option value="manual">Best Route (Manual)</option>
       <option value="direct" selected>Direct Route (Loads in Order, Multi-Route)</option>
     </select>
@@ -113,7 +112,7 @@
 <script>
 document.getElementById("excelInput").addEventListener("change", async (e) => {
   if (currentRouteMode === "direct") {
-    alert("Excel import is only available in AI or Best Route mode.");
+    alert("Excel import is only available in Best Route mode.");
     return;
   }
 

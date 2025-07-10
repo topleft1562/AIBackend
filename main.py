@@ -783,6 +783,7 @@ def handle_manual_routes():
             load["weight"] = float(load.get("weight", 0))
             load["revenue"] = load["rate"] * load["weight"]
 
+        # Distance prep
         city_pairs = set()
         for load in loads:
             pickup = load["pickupCity"]
@@ -804,21 +805,34 @@ def handle_manual_routes():
         for origin, dests in origin_dest_map.items():
             get_distances_batch(origin, list(dests))
 
+        # Enrich loads
         result = []
         for load in loads:
             pickup = load["pickupCity"]
             dropoff = load["dropoffCity"]
-            reload_options = {
-                f"load_{other['load_id']}": {
+            route_points = load.get("routePoints", [])
+            cities = [pickup] + route_points + [dropoff]
+
+            total_loaded_km = sum(
+                DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
+                for i in range(len(cities) - 1)
+            )
+
+            reload_options = {}
+            for other in loads:
+                if other["load_id"] == load["load_id"]:
+                    continue
+                sub = [other["pickupCity"]] + other.get("routePoints", []) + [other["dropoffCity"]]
+                loaded_km = sum(
+                    DISTANCE_CACHE.get(get_distance_key(sub[i], sub[i + 1]), 0)
+                    for i in range(len(sub) - 1)
+                )
+                reload_options[f"load_{other['load_id']}"] = {
                     "pickup": other["pickupCity"],
                     "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                    "loaded_km": sum(
-                        DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
-                        for i in range(len(cities) - 1)
-                    )  
+                    "loaded_km": loaded_km
                 }
-                for other in loads if other["load_id"] != load["load_id"]
-            }
+
             result.append({
                 "load_id": load["load_id"],
                 "pickup": pickup,
@@ -827,11 +841,13 @@ def handle_manual_routes():
                 "rate": load["rate"],
                 "weight": load["weight"],
                 "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start, pickup), 0),
-                "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
+                "loaded_km": round(total_loaded_km, 1),
                 "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end), 0),
                 "reload_options": reload_options,
                 "required": load.get("required", False),
+                "routePoints": route_points
             })
+
         enriched_data = {
             "start_location": start,
             "end_location": end,
@@ -844,7 +860,7 @@ def handle_manual_routes():
             max_chain_amount=max_chain_amount
         )
 
-        # For each summary route, expand to breakdown like direct
+        # Expand with breakdowns
         expanded = []
         for idx, route in enumerate(routes):
             trip_loads = []
@@ -855,13 +871,13 @@ def handle_manual_routes():
                         "pickupCity": found["pickup"],
                         "dropoffCity": found["dropoff"],
                         "rate": found.get("rate", 0),
-                        "weight": found.get("weight", 0)
+                        "weight": found.get("weight", 0),
+                        "routePoints": found.get("routePoints", [])
                     })
             trip_route = {"start": start, "end": end, "loads": trip_loads}
             summary, step_breakdown = compute_direct_route_info(trip_route)
             route["step_breakdown"] = step_breakdown
             route["summary"] = summary
-            # Overwrite the top-level fields with computed breakdown
             route["loaded_km"] = summary["loaded_km"]
             route["empty_km"] = summary["empty_km"]
             route["total_km"] = summary["total_km"]
@@ -876,6 +892,7 @@ def handle_manual_routes():
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
 
 @app.route("/ai_plan", methods=["POST"])
 def ai_plan():
