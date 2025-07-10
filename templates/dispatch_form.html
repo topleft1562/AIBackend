@@ -17,7 +17,6 @@
     .load-row input { min-width: 130px; max-width: 130px; width: 130px; margin-right: 0; text-align: left; }
     .load-header span:last-child { min-width: 36px; max-width: 36px; width: 36px; }
     .load-row button { margin-left: 5px; min-width: 32px; }
-    .sortable-ghost { opacity: 0.4; background: #ddd; }
     .remove-route-btn { float: right; color: #e53e3e; display: inline; }
     .sort-toggle { margin-bottom: 10px; font-size: 16px; }
     .results-table { border-collapse: collapse; width: 100%; margin: 18px 0; background: #fff; }
@@ -27,7 +26,6 @@
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 <body>
 
@@ -385,12 +383,6 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
   oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
   if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
 
-  if (currentRouteMode === "direct") {
-    Sortable.create(loadsContainer, {
-      animation: 150,
-      ghostClass: "sortable-ghost"
-    });
-  }
 }
 
 function updateRouteUI() {
