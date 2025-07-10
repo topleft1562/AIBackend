@@ -105,6 +105,7 @@ def compute_direct_route_info(route, route_num=1):
                 dist += DISTANCE_CACHE.get(get_distance_key(cities[j], cities[j + 1]), 0)
 
             loaded_km += dist
+            rpm = (load_revenue / dist) if dist else 0
             num_loaded_legs += 1
 
             steps.append({
@@ -114,7 +115,7 @@ def compute_direct_route_info(route, route_num=1):
                 "rate": rate,
                 "weight": weight,
                 "revenue": round(load_revenue, 2),
-                "rpm": "-"  # not per leg
+                "rpm": rpm
             })
 
             if i < len(loads) - 1:
