@@ -10,7 +10,7 @@
     input, button, select { padding: 5px; margin-top: 5px; }
     .route-block { border: 1px solid #aaa; padding: 16px; margin-bottom: 24px; background: #f9f9f9; border-radius: 7px; }
     .route-block h3 { margin: 0 0 10px 0; }
-    .load-row { margin-bottom: 10px; display: flex; align-items: center; cursor: move; }
+    .load-row { margin-bottom: 10px; display: flex; align-items: center; }
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
     .load-header span,
@@ -237,6 +237,13 @@ function addRouteBlock() {
       <button type="button" onclick="deleteSelectedTrip(this)" style="color:#e53e3e;">❌</button>
     </div>
 
+    <div class="excelImportSection" style="margin: 10px 0; display: none;">
+      <label for="excelInput_${routeCount}" style="cursor:pointer;">
+        📥 <strong>Import from Excel</strong>
+      </label>
+      <input type="file" id="excelInput_${routeCount}" accept=".xlsx" style="display:none;" />
+    </div>
+
     <label>Start Location:</label>
     <input type="text" name="start" placeholder="Starting Point" required />
     <label>End Location:</label>
@@ -275,6 +282,16 @@ function addLoadRowWithValues(loadsContainer, values) {
   const mode = currentRouteMode;
   const row = document.createElement('div');
   row.className = "load-row";
+
+  let buttonsHTML = `<button type="button" onclick="removeLoadRow(this)">❌</button>`;
+  if (mode === "direct") {
+    buttonsHTML = `
+      <button type="button" class="move-up-btn" onclick="moveLoadUp(this)">⬆️</button>
+      <button type="button" class="move-down-btn" onclick="moveLoadDown(this)">⬇️</button>
+      ${buttonsHTML}
+    `;
+  }
+
   row.innerHTML = `
     <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
     <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
@@ -282,8 +299,9 @@ function addLoadRowWithValues(loadsContainer, values) {
     <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
     <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
     ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
-    <button type="button" onclick="removeLoadRow(this)">❌</button>
+    ${buttonsHTML}
   `;
+
   loadsContainer.appendChild(row);
 }
 
@@ -355,6 +373,19 @@ function updateRouteUI() {
 
     const excelDiv = block.querySelector('.excelImportSection');
     if (excelDiv) excelDiv.style.display = (currentRouteMode !== "direct") ? "block" : "none";
+
+    const loadRows = block.querySelectorAll(".load-row");
+    loadRows.forEach(row => {
+      const upBtn = row.querySelector(".move-up-btn");
+      const downBtn = row.querySelector(".move-down-btn");
+      if (currentRouteMode === "direct") {
+        if (upBtn) upBtn.style.display = 'inline-block';
+        if (downBtn) downBtn.style.display = 'inline-block';
+      } else {
+        if (upBtn) upBtn.style.display = 'none';
+        if (downBtn) downBtn.style.display = 'none';
+      }
+    });
   });
 
   if (currentRouteMode === "direct") {
@@ -375,9 +406,22 @@ function updateRouteUI() {
   document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 
-  // Always show save/load buttons (no matter what mode)
   const tripControls = document.querySelectorAll('.trip-select, [onclick*="saveThisRoute"], [onclick*="clearSelectedTrip"], [onclick*="deleteSelectedTrip"]');
   tripControls.forEach(el => el.style.display = 'inline-block');
+}
+
+function moveLoadUp(button) {
+  const row = button.closest('.load-row');
+  const container = row.parentElement;
+  const prev = row.previousElementSibling;
+  if (prev) container.insertBefore(row, prev);
+}
+
+function moveLoadDown(button) {
+  const row = button.closest('.load-row');
+  const container = row.parentElement;
+  const next = row.nextElementSibling;
+  if (next) container.insertBefore(next, row);
 }
 
 
