@@ -280,47 +280,42 @@ function addLoadRowWithValues(loadsContainer, values) {
   const mode = currentRouteMode;
   const row = document.createElement('div');
   const routePoints = values.routePoints || [];
-  row.className = "load-row";
-
-  row.innerHTML = `
-    <div class="pickup-with-routepoints">
-      <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
-      <div class="routepoints-container"></div>
-      <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕ Add Stop</button>
-    </div>
-
-    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
-    ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
-    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
-    <input type="number" name="weight" placeholder="Weight" value="${values.weight || 43}" min="0" step="0.01" required />
-    ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
-
-    <div class="row-buttons">
-      ${mode === "direct" ? `
-        <button type="button" class="move-up-btn" onclick="moveLoadUp(this)">⬆️</button>
-        <button type="button" class="move-down-btn" onclick="moveLoadDown(this)">⬇️</button>
-      ` : ""}
-      <button type="button" onclick="removeLoadRow(this)">❌</button>
-    </div>
-  `;
-
-  loadsContainer.appendChild(row);
-
-  // Fill preexisting routepoints
   setTimeout(() => {
     const container = row.querySelector('.routepoints-container');
-    routePoints.forEach((point, i) => {
+    routePoints.forEach(point => {
       const dummyBtn = document.createElement("button");
-      addRoutePoint(dummyBtn); // Simulate button press
-      const inputs = container.querySelectorAll("input[name='routePoint']");
-      if (inputs.length) {
-        inputs[inputs.length - 1].value = point;
-        inputs[inputs.length - 1].placeholder = `Route Point ${i + 1}`;
+      addRoutePoint(dummyBtn); // call it as if button was clicked
+      const lastInput = container.querySelectorAll("input[name='routePoint']");
+      if (lastInput.length) {
+        lastInput[lastInput.length - 1].value = point;
       }
     });
   }, 0);
-}
+  row.className = "load-row";
 
+  let buttonsHTML = `<button type="button" onclick="removeLoadRow(this)">❌</button>`;
+  if (mode === "direct") {
+    buttonsHTML = `
+      <button type="button" class="move-up-btn" onclick="moveLoadUp(this)">⬆️</button>
+      <button type="button" class="move-down-btn" onclick="moveLoadDown(this)">⬇️</button>
+      ${buttonsHTML}
+    `;
+  }
+
+  row.innerHTML = `
+    <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+    <div class="routepoints-container" style="display:inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 6px;"></div>
+    <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
+    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
+    ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
+    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
+    <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
+    ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
+    ${buttonsHTML}
+  `;
+
+  loadsContainer.appendChild(row);
+}
 
 
 
