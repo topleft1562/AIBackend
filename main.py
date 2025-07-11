@@ -224,12 +224,6 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
                 "step_breakdown": []
             })
 
-        remaining_loaded = sum(get_load_loaded_km(l) for l in loads if l["load_id"] not in used_ids)
-        possible_total = loaded_km + remaining_loaded
-        possible_km = total_km + remaining_loaded
-        if possible_km and (possible_total / possible_km < loaded_pct_threshold):
-            return
-
         remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
         remaining_required = required_ids - set([l["load_id"] for l in path])
         if len(remaining_unused) < len(remaining_required):
