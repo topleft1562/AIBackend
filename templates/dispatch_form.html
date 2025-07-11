@@ -292,15 +292,43 @@ function addLoadRowWithValues(loadsContainer, values) {
   }
 
   row.innerHTML = `
-    <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
-    <div class="routepoints-container" style="display:inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 6px;"></div>
-    <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
-    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
-    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
-    <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
-    ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
-    ${buttonsHTML}
-  `;
+    <div style="display:flex; flex-direction:column;">
+      <label>Pickup</label>
+      <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+    </div>
+  
+    <div class="routepoints-container" style="display:flex; flex-direction:column; gap:4px; margin: 0 6px;"></div>
+
+    <div style="display:flex; flex-direction:column;">
+      <label>Add</label>
+      <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
+    </div>
+
+    <div style="display:flex; flex-direction:column;">
+      <label>Dropoff</label>
+      <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
+    </div>
+
+    <div style="display:flex; flex-direction:column;">
+      <label>Rate ($/MT)</label>
+      <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
+    </div>
+
+    <div style="display:flex; flex-direction:column;">
+      <label>Weight (MT)</label>
+      <input type="number" name="weight" min="0" step="0.01" value="${values.weight || 43}" required />
+    </div>
+
+    ${mode === "manual" ? `
+      <div style="display:flex; flex-direction:column;">
+        <label>Required</label>
+        <input type="checkbox" name="required" ${values.required ? "checked" : ""} />
+      </div>
+    ` : ""}
+
+    <div style="display:flex; flex-direction:column; justify-content:end;">${buttonsHTML}</div>
+  `;  
+
 
   loadsContainer.appendChild(row);
   const container = row.querySelector('.routepoints-container');
@@ -324,7 +352,11 @@ function addRoutePoint(button) {
   const container = button.parentElement.querySelector(".routepoints-container");
 
   const wrapper = document.createElement("div");
-  wrapper.style = "display:inline-flex; align-items:center; gap:4px;";
+  wrapper.style = "display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px;";
+
+  const label = document.createElement("label");
+  label.textContent = `Route Point ${container.children.length + 1}`;
+  label.style = "font-size: 12px;";
 
   const input = document.createElement("input");
   input.type = "text";
@@ -334,13 +366,23 @@ function addRoutePoint(button) {
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.innerText = "❌";
-  removeBtn.style = "margin-left: 4px; color: red;";
-  removeBtn.onclick = () => wrapper.remove();
+  removeBtn.style = "margin-top: 2px; width: fit-content; align-self: flex-start; color: red;";
+  removeBtn.onclick = () => {
+    wrapper.remove();
+    // Optional: renumber remaining labels
+    const children = container.querySelectorAll("div");
+    children.forEach((el, i) => {
+      const lbl = el.querySelector("label");
+      if (lbl) lbl.textContent = `Route Point ${i + 1}`;
+    });
+  };
 
+  wrapper.appendChild(label);
   wrapper.appendChild(input);
   wrapper.appendChild(removeBtn);
   container.appendChild(wrapper);
 }
+
 
 function updateRouteNumbers() {
   const blocks = document.querySelectorAll('.route-block');
@@ -354,16 +396,7 @@ function updateRouteNumbers() {
 
 function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
   const header = routeDiv.querySelector('.load-header');
-  if (!header) return;
-  let headerHtml = `
-    <span>Pickup</span>
-    <span>Dropoff</span>
-    <span>Rate ($/MT)</span>
-    <span>Weight (MT)</span>
-    ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}
-    <span></span>
-  `;
-  header.innerHTML = headerHtml;
+  if (header) header.innerHTML = `<strong>Route Data</strong>`;
 
   const loadsContainer = routeDiv.querySelector('.loadsContainer');
   const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
@@ -385,8 +418,8 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
   loadsContainer.innerHTML = "";
   oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
   if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
-
 }
+
 
 function updateRouteUI() {
   const addRouteBtn = document.getElementById("addRouteBtn");
