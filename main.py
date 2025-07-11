@@ -28,6 +28,13 @@ def get_distance_key(origin, destination):
     sorted_pair = sorted([normalize_city(origin), normalize_city(destination)])
     return f"{sorted_pair[0]}|{sorted_pair[1]}"
 
+def calculate_loaded_km(pickup: str, route_points: list[str], dropoff: str):
+    all_cities = [pickup] + route_points + [dropoff]
+    total = 0.0
+    for i in range(len(all_cities) - 1):
+        total += DISTANCE_CACHE.get(get_distance_key(all_cities[i], all_cities[i + 1]), 0)
+    return round(total, 1)
+
 def get_distances_batch(origin, destinations):
     origin = normalize_city(origin)
     destinations = [normalize_city(d) for d in destinations if d != origin]
@@ -347,10 +354,7 @@ def dispatch_async():
                     f"load_{other['load_id']}": {
                         "pickup": other["pickupCity"],
                         "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                        "loaded_km": sum(
-                            DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
-                            for i in range(len(cities) - 1)
-                        )   
+                        "loaded_km": calculate_loaded_km(other["pickupCity"], other.get("routePoints", []), other["dropoffCity"]),
                     }
                     for other in loads if other["load_id"] != load["load_id"]
                 }
@@ -362,7 +366,7 @@ def dispatch_async():
                     "rate": load["rate"],
                     "weight": load["weight"],
                     "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
-                    "loaded_km": round(get_loaded_distance_with_routepoints(pickup, load.get("routePoints", []), dropoff), 1),
+                    "loaded_km": calculate_loaded_km(pickup, load.get("routePoints", []), dropoff),
                     "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end_location), 0),
                     "reload_options": reload_options,
                     "required": load.get("required", False),
@@ -486,7 +490,7 @@ def direct_route_multi():
 
     all_results = []
     for idx, route in enumerate(routes):
-        summary, breakdown = compute_direct_route_info(route, idx + 1)
+        summary, breakdown = compute_direct_route_info(route)
         all_results.append({
             "summary": summary,
             "step_breakdown": breakdown
