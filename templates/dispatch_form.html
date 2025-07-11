@@ -31,6 +31,12 @@
     .settings-block { margin: 18px 0; }
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
+    .routepoints-container {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 8px;
+    }
     button:hover {
       filter: brightness(1.2);
       cursor: pointer;
@@ -368,15 +374,17 @@ function removeLoadRow(btn) {
 }
 
 function addRoutePoint(button) {
-  const row = button.closest('.load-row');
-  const container = row.querySelector(".routepoints-container");
+  const container = button.parentElement.parentElement.querySelector(".routepoints-container");
 
   const wrapper = document.createElement("div");
-  wrapper.style = "display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px;";
+  wrapper.style = "display: inline-flex; flex-direction: column; align-items: center; margin-right: 8px;";
 
   const label = document.createElement("label");
   label.textContent = `Route Point ${container.children.length + 1}`;
-  label.style = "font-size: 11px;";
+  label.style = "font-size: 11px; text-align: center;";
+
+  const inner = document.createElement("div");
+  inner.style = "display: inline-flex; align-items: center; gap: 4px;";
 
   const input = document.createElement("input");
   input.type = "text";
@@ -386,21 +394,18 @@ function addRoutePoint(button) {
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.innerText = "❌";
-  removeBtn.style = "margin-top: 2px; width: fit-content; align-self: flex-start; color: red;";
-  removeBtn.onclick = () => {
-    wrapper.remove();
-    const children = container.querySelectorAll("div");
-    children.forEach((el, i) => {
-      const lbl = el.querySelector("label");
-      if (lbl) lbl.textContent = `Route Point ${i + 1}`;
-    });
-  };
+  removeBtn.style = "color: red;";
+  removeBtn.onclick = () => wrapper.remove();
+
+  inner.appendChild(input);
+  inner.appendChild(removeBtn);
 
   wrapper.appendChild(label);
-  wrapper.appendChild(input);
-  wrapper.appendChild(removeBtn);
+  wrapper.appendChild(inner);
+
   container.appendChild(wrapper);
 }
+
 
 function updateRouteNumbers() {
   const blocks = document.querySelectorAll('.route-block');
