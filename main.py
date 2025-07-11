@@ -431,7 +431,8 @@ def dispatch_async():
                             "dropoffCity": found["dropoff"],
                             "rate": found["rate"],
                             "weight": found["weight"],
-                            "revenue": found["revenue"]
+                            "revenue": found["revenue"],
+                            "routePoints": found.get("route_points", [])
                         })
                 trip_route = {
                     "start": enriched_data["start_location"],
