@@ -306,7 +306,6 @@ function addLoadRowWithValues(loadsContainer, values) {
     <div class="routepoints-container" style="display:inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 6px;"></div>
     <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
     <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
-    ${mode === "best" ? `<input type="number" name="count" placeholder="# of Loads" value="${values.count || 1}" min="1" required />` : ""}
     <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
     <input type="number" name="weight" placeholder="Weight" min="0" step="0.01" value="${values.weight || 43}" required />
     ${mode === "manual" ? `<input type="checkbox" name="required" style="margin-left:6px;" />` : ""}
@@ -360,7 +359,6 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
   let headerHtml = `
     <span>Pickup</span>
     <span>Dropoff</span>
-    ${currentRouteMode === "best" ? "<span># of Loads</span>" : ""}
     <span>Rate ($/MT)</span>
     <span>Weight (MT)</span>
     ${currentRouteMode === "manual" ? "<span>Required?</span>" : ""}
@@ -432,7 +430,7 @@ function updateRouteUI() {
     removeBtns.forEach(btn => btn.style.display = "none");
   }
 
-  document.getElementById("extraSettings").style.display = (currentRouteMode === "manual" || currentRouteMode === "best") ? "block" : "none";
+  document.getElementById("extraSettings").style.display = currentRouteMode === "manual"  ? "block" : "none";
   document.getElementById("sortToggleDiv").style.display = (currentRouteMode === "manual") ? "block" : "none";
 
   const tripControls = document.querySelectorAll('.trip-select, [onclick*="saveThisRoute"], [onclick*="clearSelectedTrip"], [onclick*="deleteSelectedTrip"]');
@@ -474,12 +472,11 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
     const weights = routeDiv.querySelectorAll("input[name='weight']");
     const requireds = routeDiv.querySelectorAll("input[name='required']");
     const isManualMode = (currentRouteMode === "manual");
-    const isBestMode = (currentRouteMode === "best");
     const loads = [];
     for (let i = 0; i < pickups.length; i++) {
       const pickup = pickups[i].value.trim();
       const dropoff = dropoffs[i].value.trim();
-      const count = isBestMode ? parseInt(counts[i].value) : 1;
+      const count = 1;
       const rate = parseFloat(rates[i].value);
       const weight = parseFloat(weights[i].value);
       const required = isManualMode && requireds[i] ? requireds[i].checked : false;
@@ -530,10 +527,7 @@ document.getElementById("dispatchForm").addEventListener("submit", async functio
   if (currentRouteMode === "direct") {
     endpoint = "/direct_route_multi";
     payload = { routes: dataToSend };
-  } else {
-    endpoint = "/dispatch";
-    payload = { ...dataToSend[0], loaded_pct_goal: loadedPctGoal, max_chain_amount: maxChainLength };
-  }
+  } 
 
   const response = await fetch(endpoint, {
     method: "POST",
