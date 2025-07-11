@@ -173,7 +173,6 @@ def compute_direct_route_info(route, route_num=1):
 
 
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
-   
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -194,6 +193,7 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
         if task_progress_hook and callable(getattr(task_progress_hook, "check_cancelled", None)):
             if task_progress_hook.check_cancelled():
                 raise Exception("Task cancelled")
+
         if len(path) >= max_chain_amount:
             return
 
@@ -231,17 +231,23 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             lid = load["load_id"]
             if lid in used_ids:
                 continue
+
             prev = path[-1]
             reload_info = prev["reload_options"].get(f"load_{lid}")
             if not reload_info:
                 continue
+
             new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
             new_loaded = loaded_km + load["loaded_km"]
             new_revenue = revenue + load.get("revenue", 0.0)
-            new_steps = city_steps + [
-                f"<span style='color:blue'>{load['pickup']}</span>",
-                f"<span style='color:red'>{load['dropoff']}</span>",
+
+            # Build updated city step sequence
+            route_cities = load.get("route_cities", [load["pickup"], load["dropoff"]])
+            step_parts = [f"<span style='color:blue'>{city}</span>" for city in route_cities[:-1]] + [
+                f"<span style='color:red'>{route_cities[-1]}</span>"
             ]
+            new_steps = city_steps + step_parts
+
             search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
 
     def worker():
@@ -250,14 +256,18 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
                 load = task_queue.get_nowait()
             except:
                 break
+
             lid = load["load_id"]
             local_results = []
             try:
-                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], [
-                    f"<span style='color:green'>{start}</span>",
-                    f"<span style='color:blue'>{load['pickup']}</span>",
-                    f"<span style='color:red'>{load['dropoff']}</span>",
-                ], local_results)
+                route_cities = load.get("route_cities", [load["pickup"], load["dropoff"]])
+                step_parts = [f"<span style='color:blue'>{city}</span>" for city in route_cities[:-1]] + [
+                    f"<span style='color:red'>{route_cities[-1]}</span>"
+                ]
+                city_steps = [f"<span style='color:green'>{start}</span>"] + step_parts
+
+                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], city_steps, local_results)
+
                 with result_lock:
                     results.extend(local_results)
             except Exception as e:
@@ -286,7 +296,6 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
 
 
 
-
 @app.route("/cancel_task/<task_id>", methods=["POST"])
 def cancel_task(task_id):
     if task_id in TASKS and TASKS[task_id]["state"] == "in_progress":
@@ -304,7 +313,6 @@ def dispatch_async():
         "result": None,
         "cancelled": False
     }
-
 
     def run_task():
         try:
@@ -324,6 +332,7 @@ def dispatch_async():
                 load["rate"] = float(load.get("rate", 0))
                 load["weight"] = float(load.get("weight", 0))
                 load["revenue"] = load["rate"] * load["weight"]
+                load["routePoints"] = [normalize_city(p) for p in load.get("routePoints", [])]
 
             TASKS[task_id]["progress"] = 15
 
@@ -332,9 +341,16 @@ def dispatch_async():
             for load in loads:
                 pickup = load["pickupCity"]
                 dropoff = load["dropoffCity"]
-                city_pairs.update({(start_location, pickup), (pickup, dropoff), (dropoff, end_location)})
+                route_points = load.get("routePoints", [])
+                route_cities = [pickup] + route_points + [dropoff]
+
+                city_pairs.add((start_location, pickup))
+                city_pairs.add((route_cities[-1], end_location))
+                for i in range(len(route_cities) - 1):
+                    city_pairs.add((route_cities[i], route_cities[i+1]))
+
                 for other in loads:
-                    city_pairs.add((dropoff, other["pickupCity"]))
+                    city_pairs.add((route_cities[-1], other["pickupCity"]))
 
             origin_dest_map = defaultdict(set)
             for origin, dest in city_pairs:
@@ -349,22 +365,35 @@ def dispatch_async():
             for load in loads:
                 pickup = load["pickupCity"]
                 dropoff = load["dropoffCity"]
+                route_points = load.get("routePoints", [])
+                route_cities = [pickup] + route_points + [dropoff]
+                final_city = route_cities[-1]
+
+                # Calculate total loaded_km for this full path
+                loaded_km = 0
+                for i in range(len(route_cities) - 1):
+                    loaded_km += DISTANCE_CACHE.get(get_distance_key(route_cities[i], route_cities[i+1]), 0)
+
                 reload_options = {
                     f"load_{other['load_id']}": {
                         "pickup": other["pickupCity"],
-                        "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
+                        "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(final_city, other["pickupCity"]), 0),
                         "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
                     }
                     for other in loads if other["load_id"] != load["load_id"]
                 }
+
                 result.append({
                     "load_id": load["load_id"],
                     "pickup": pickup,
                     "dropoff": dropoff,
+                    "route_points": route_points,
+                    "route_cities": route_cities,
+                    "final_city": final_city,
                     "revenue": load["revenue"],
                     "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
-                    "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
-                    "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end_location), 0),
+                    "loaded_km": round(loaded_km, 1),
+                    "return_km": DISTANCE_CACHE.get(get_distance_key(final_city, end_location), 0),
                     "reload_options": reload_options,
                     "required": load.get("required", False),
                 })
@@ -405,7 +434,8 @@ def dispatch_async():
                             "pickupCity": found["pickup"],
                             "dropoffCity": found["dropoff"],
                             "rate": found.get("rate", 0),
-                            "weight": found.get("weight", 0)
+                            "weight": found.get("weight", 0),
+                            "routePoints": found.get("route_points", [])
                         })
                 trip_route = {
                     "start": enriched_data["start_location"],
@@ -429,7 +459,6 @@ def dispatch_async():
                 "progress": 100,
                 "result": expanded
             }
-
 
         except Exception as e:
             import traceback
