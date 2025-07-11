@@ -173,6 +173,7 @@ def compute_direct_route_info(route, route_num=1):
 
 
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
+   
     start = enriched_data["start_location"]
     end = enriched_data["end_location"]
     loads = enriched_data["loads"]
@@ -181,27 +182,18 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
     results = []
     result_lock = Lock()
     progress_queue = Queue()
-    task_queue = Queue()
 
+    task_queue = Queue()
     for load in loads:
         task_queue.put(load)
 
     total_tasks = task_queue.qsize()
     progress_done = 0
 
-    def get_load_revenue(load):
-        return load["rate"] * load["weight"]
-
-    def get_load_loaded_km(load):
-        return get_loaded_distance_with_routepoints(
-            load["pickup"], load.get("routePoints", []), load["dropoff"]
-        )
-
     def search(path, used_ids, loaded_km, empty_km, revenue, city_steps, local_results):
         if task_progress_hook and callable(getattr(task_progress_hook, "check_cancelled", None)):
             if task_progress_hook.check_cancelled():
                 raise Exception("Task cancelled")
-
         if len(path) >= max_chain_amount:
             return
 
@@ -224,7 +216,7 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
                 "step_breakdown": []
             })
 
-        remaining_loaded = sum(get_load_loaded_km(l) for l in loads if l["load_id"] not in used_ids)
+        remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
         possible_total = loaded_km + remaining_loaded
         possible_km = total_km + remaining_loaded
         if possible_km and (possible_total / possible_km < loaded_pct_threshold):
@@ -243,18 +235,13 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             reload_info = prev["reload_options"].get(f"load_{lid}")
             if not reload_info:
                 continue
-
             new_empty = empty_km + reload_info.get("deadhead_from_this_dropoff", reload_info.get("deadhead_to_this_pickup", 0))
-            new_loaded = loaded_km + get_load_loaded_km(load)
-            new_revenue = revenue + get_load_revenue(load)
-
-            step_cities = [f"<span style='color:blue'>{load['pickup']}</span>"]
-            for rp in load.get("routePoints", []):
-                step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
-            step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
-
-            new_steps = city_steps + step_cities
-
+            new_loaded = loaded_km + load["loaded_km"]
+            new_revenue = revenue + load.get("revenue", 0.0)
+            new_steps = city_steps + [
+                f"<span style='color:blue'>{load['pickup']}</span>",
+                f"<span style='color:red'>{load['dropoff']}</span>",
+            ]
             search(path + [load], used_ids | {lid}, new_loaded, new_empty, new_revenue, new_steps, local_results)
 
     def worker():
@@ -266,24 +253,11 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
             lid = load["load_id"]
             local_results = []
             try:
-                step_cities = [
+                search([load], {lid}, load["loaded_km"], load["deadhead_km"], load["revenue"], [
                     f"<span style='color:green'>{start}</span>",
                     f"<span style='color:blue'>{load['pickup']}</span>",
-                ]
-                for rp in load.get("routePoints", []):
-                    step_cities.append(f"<span style='color:orange'>{rp.title()}</span>")
-                step_cities.append(f"<span style='color:red'>{load['dropoff']}</span>")
-
-                search(
-                    [load],
-                    {lid},
-                    get_load_loaded_km(load),
-                    load["deadhead_km"],
-                    get_load_revenue(load),
-                    step_cities,
-                    local_results
-                )
-
+                    f"<span style='color:red'>{load['dropoff']}</span>",
+                ], local_results)
                 with result_lock:
                     results.extend(local_results)
             except Exception as e:
