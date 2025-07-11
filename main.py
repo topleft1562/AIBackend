@@ -347,7 +347,6 @@ def dispatch_async():
                 load["load_id"] = i + 1
                 load["pickupCity"] = normalize_city(load["pickupCity"])
                 load["dropoffCity"] = normalize_city(load["dropoffCity"])
-                load["routePoints"] = [normalize_city(p) for p in load.get("routePoints", [])]
                 load["rate"] = float(load.get("rate", 0))
                 load["weight"] = float(load.get("weight", 0))
                 load["revenue"] = load["rate"] * load["weight"]
@@ -359,13 +358,7 @@ def dispatch_async():
             for load in loads:
                 pickup = load["pickupCity"]
                 dropoff = load["dropoffCity"]
-                route_points = load.get("routePoints", [])
-                cities = [pickup] + route_points + [dropoff]
-
-                city_pairs.add((start_location, pickup))
-                for i in range(len(cities) - 1):
-                    city_pairs.add((cities[i], cities[i + 1]))
-                city_pairs.add((dropoff, end_location))
+                city_pairs.update({(start_location, pickup), (pickup, dropoff), (dropoff, end_location)})
                 for other in loads:
                     city_pairs.add((dropoff, other["pickupCity"]))
 
@@ -386,10 +379,7 @@ def dispatch_async():
                     f"load_{other['load_id']}": {
                         "pickup": other["pickupCity"],
                         "deadhead_to_this_pickup": DISTANCE_CACHE.get(get_distance_key(dropoff, other["pickupCity"]), 0),
-                        "loaded_km": sum(
-                            DISTANCE_CACHE.get(get_distance_key(cities[i], cities[i + 1]), 0)
-                            for i in range(len(cities) - 1)
-                        )   
+                        "loaded_km": DISTANCE_CACHE.get(get_distance_key(other["pickupCity"], other["dropoffCity"]), 0)
                     }
                     for other in loads if other["load_id"] != load["load_id"]
                 }
@@ -398,10 +388,8 @@ def dispatch_async():
                     "pickup": pickup,
                     "dropoff": dropoff,
                     "revenue": load["revenue"],
-                    "rate": load["rate"],
-                    "weight": load["weight"],
                     "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
-                    "loaded_km": round(get_loaded_distance_with_routepoints(pickup, load.get("routePoints", []), dropoff), 1),
+                    "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
                     "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end_location), 0),
                     "reload_options": reload_options,
                     "required": load.get("required", False),
@@ -479,6 +467,7 @@ def dispatch_async():
 
     Thread(target=run_task).start()
     return jsonify({"task_id": task_id})
+
 
 
 @app.route("/task_status/<task_id>")
