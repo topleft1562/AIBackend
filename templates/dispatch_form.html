@@ -279,17 +279,7 @@ function addLoadRowWithValues(loadsContainer, values) {
   const mode = currentRouteMode;
   const row = document.createElement('div');
   const routePoints = values.routePoints || [];
-  setTimeout(() => {
-    const container = row.querySelector('.routepoints-container');
-    routePoints.forEach(point => {
-      const dummyBtn = document.createElement("button");
-      addRoutePoint(dummyBtn); // call it as if button was clicked
-      const lastInput = container.querySelectorAll("input[name='routePoint']");
-      if (lastInput.length) {
-        lastInput[lastInput.length - 1].value = point;
-      }
-    });
-  }, 0);
+  
   row.className = "load-row";
 
   let buttonsHTML = `<button type="button" onclick="removeLoadRow(this)">❌</button>`;
@@ -313,6 +303,15 @@ function addLoadRowWithValues(loadsContainer, values) {
   `;
 
   loadsContainer.appendChild(row);
+  const container = row.querySelector('.routepoints-container');
+  routePoints.forEach(point => {
+    const dummyBtn = row.querySelector('.add-routepoint-btn');
+    addRoutePoint(dummyBtn);
+    const lastInput = container.querySelectorAll("input[name='routePoint']");
+    if (lastInput.length) {
+      lastInput[lastInput.length - 1].value = point;
+    }
+  });
 }
 
 
