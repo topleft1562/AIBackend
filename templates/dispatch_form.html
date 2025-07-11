@@ -10,7 +10,13 @@
     input, button, select { padding: 5px; margin-top: 5px; }
     .route-block { border: 1px solid #aaa; padding: 16px; margin-bottom: 24px; background: #f9f9f9; border-radius: 7px; }
     .route-block h3 { margin: 0 0 10px 0; }
-    .load-row { margin-bottom: 10px; display: flex; align-items: center; }
+    .load-row {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
     .load-row input { margin-right: 0; border: 1px solid #ccc; box-sizing: border-box; }
     .load-header { display: flex; font-weight: bold; margin-bottom: 3px; }
     .load-header span,
@@ -25,6 +31,10 @@
     .settings-block { margin: 18px 0; }
     .settings-block label { margin-right: 12px; display: inline-block; }
     .settings-block input { margin-right: 18px; width: 60px; }
+    button:hover {
+      filter: brightness(1.2);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -299,9 +309,9 @@ function addLoadRowWithValues(loadsContainer, values) {
 
   <div class="routepoints-container" style="display:flex; flex-direction:column; gap:4px; margin: 0 6px;"></div>
 
-  <div style="display:flex; flex-direction:column; font-size: 11px; margin-right: 8px;">
-    <label>Add</label>
-    <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
+  <div style="display:flex; flex-direction:column; font-size:11px; align-items:center; margin-right: 8px;">
+    <label style="margin-bottom:2px;">Add</label>
+    <button type="button" class="add-routepoint-btn" title="Add Route Point" onclick="addRoutePoint(this)">➕</button>
   </div>
 
   <div style="display:flex; flex-direction:column; font-size: 11px;">
@@ -326,13 +336,15 @@ function addLoadRowWithValues(loadsContainer, values) {
     </div>
   ` : ""}
 
-  <div style="display:flex; align-items:end; gap: 4px;">
-    ${mode === "direct" ? `
-      <button type="button" class="move-up-btn" onclick="moveLoadUp(this)">⬆️</button>
-      <button type="button" class="move-down-btn" onclick="moveLoadDown(this)">⬇️</button>
-    ` : ""}
-    <button type="button" onclick="removeLoadRow(this)" style="color: red;">❌</button>
+  <div style="display:flex; flex-direction:column; align-items:center; font-size:11px;">
+    <label style="margin-bottom:2px;">Controls</label>
+    <div style="display:flex; gap:4px;">
+      <button type="button" class="move-up-btn" title="Move Up" onclick="moveLoadUp(this)">🔼</button>
+      <button type="button" class="move-down-btn" title="Move Down" onclick="moveLoadDown(this)">🔽</button>
+      <button type="button" title="Remove Row" onclick="removeLoadRow(this)" style="color: red;">❌</button>
+    </div>
   </div>
+
 `;
 
 
