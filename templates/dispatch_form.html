@@ -33,8 +33,10 @@
     .settings-block input { margin-right: 18px; width: 60px; }
     .routepoints-container {
       display: inline-flex;
+      flex-wrap: nowrap;        /* ✅ force single row */
       align-items: flex-start;
-      gap: 8px;
+      gap: 12px;
+      overflow-x: auto;         /* ✅ allow scroll if too many */
     }
     button:hover {
       filter: brightness(1.2);
