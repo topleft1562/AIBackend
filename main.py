@@ -1,9 +1,7 @@
 import os
-import json
 import requests
-from urllib.parse import unquote
 from agent_engine import get_agent_runner
-from flask import Flask, render_template, request, jsonify, render_template_string
+from flask import Flask, render_template, request, jsonify
 from collections import defaultdict
 from planner import generate_plan
 from routing import build_route_matrix, get_loaded_distance_with_routepoints
@@ -60,116 +58,79 @@ def get_distances_batch(origin, destinations):
     except Exception as e:
         print(f"Error fetching from {origin} to batch: {e}")
 
-def compute_direct_route_info(route, route_num=1):
-    start = normalize_city(route.get("start", ""))
-    end = normalize_city(route.get("end", ""))
-    loads = route.get("loads", [])
+def compute_direct_route_info(trip_route):
+    cities = [trip_route["start"]]
+    total_loaded_km = 0
+    total_empty_km = 0
+    total_revenue = 0
 
-    loaded_km = 0.0
-    empty_km = 0.0
-    total_revenue = 0.0
-    steps = []
-    num_loaded_legs = 0
+    step_breakdown = []
 
-    if loads:
-        # Empty: Start → first pickup
-        first_pickup = normalize_city(loads[0]["pickupCity"])
-        empty_to_first = DISTANCE_CACHE.get(get_distance_key(start, first_pickup), 0)
-        empty_km += empty_to_first
-        steps.append({
-            "type": "empty",
-            "segment": f"{start} → {first_pickup}",
-            "kms": empty_to_first,
-            "rate": "-",
-            "weight": "-",
-            "revenue": "-",
-            "rpm": "0.00"
+    for load in trip_route["loads"]:
+        pickup = load["pickupCity"]
+        dropoff = load["dropoffCity"]
+        route_points = load.get("routePoints", [])
+
+        all_cities = [pickup] + route_points + [dropoff]
+
+        # Deadhead from previous drop (or start) to pickup
+        deadhead = DISTANCE_CACHE.get(get_distance_key(cities[-1], pickup), 0)
+        total_empty_km += deadhead
+        cities.append(pickup)
+        step_breakdown.append({
+            "type": "deadhead",
+            "from": cities[-2],
+            "to": pickup,
+            "km": round(deadhead, 1)
         })
 
-        for i, load in enumerate(loads):
-            pickup = normalize_city(load["pickupCity"])
-            dropoff = normalize_city(load["dropoffCity"])
-            route_points = [normalize_city(p) for p in load.get("routePoints", [])]
-
-            rate = load.get("rate", "-")
-            weight = load.get("weight", "-")
-            revenue = rate * weight
-
-            # Build city list: pickup → [route points] → dropoff
-            cities = [pickup] + route_points + [dropoff]
-            segment_label = " → ".join(cities)
-
-            dist = 0
-            for j in range(len(cities) - 1):
-                dist += DISTANCE_CACHE.get(get_distance_key(cities[j], cities[j + 1]), 0)
-
-            loaded_km += dist
-            total_revenue += revenue
-            num_loaded_legs += 1
-            miles = dist * 0.621371
-            rpm = (revenue / miles) if miles else 0
-
-            steps.append({
+        # Loaded route: pickup → routePoints → dropoff
+        for i in range(len(all_cities) - 1):
+            seg_from = all_cities[i]
+            seg_to = all_cities[i + 1]
+            seg_km = DISTANCE_CACHE.get(get_distance_key(seg_from, seg_to), 0)
+            total_loaded_km += seg_km
+            cities.append(seg_to)
+            step_breakdown.append({
                 "type": "loaded",
-                "segment": segment_label,
-                "kms": round(dist, 1),
-                "rate": rate,
-                "weight": weight,
-                "revenue": revenue,
-                "rpm": f"{rpm:.2f}"
+                "from": seg_from,
+                "to": seg_to,
+                "km": round(seg_km, 1)
             })
 
-            # Empty between this dropoff and next pickup
-            if i < len(loads) - 1:
-                next_pickup = normalize_city(loads[i + 1]["pickupCity"])
-                deadhead = DISTANCE_CACHE.get(get_distance_key(dropoff, next_pickup), 0)
-                empty_km += deadhead
-                steps.append({
-                    "type": "empty",
-                    "segment": f"{dropoff} → {next_pickup}",
-                    "kms": deadhead,
-                    "rate": "-",
-                    "weight": "-",
-                    "revenue": "-",
-                    "rpm": "0.00"
-                })
+        # Revenue per load
+        rate = float(load.get("rate", 0))
+        weight = float(load.get("weight", 0))
+        total_revenue += rate * weight
 
-        # Final empty: last dropoff → end
-        last_drop = normalize_city(loads[-1]["dropoffCity"])
-        empty_back = DISTANCE_CACHE.get(get_distance_key(last_drop, end), 0)
-        empty_km += empty_back
-        steps.append({
-            "type": "empty",
-            "segment": f"{last_drop} → {end}",
-            "kms": empty_back,
-            "rate": "-",
-            "weight": "-",
-            "revenue": "-",
-            "rpm": "0.00"
-        })
+    # Final return leg: last dropoff to end
+    return_km = DISTANCE_CACHE.get(get_distance_key(cities[-1], trip_route["end"]), 0)
+    total_empty_km += return_km
+    cities.append(trip_route["end"])
+    step_breakdown.append({
+        "type": "return",
+        "from": cities[-2],
+        "to": trip_route["end"],
+        "km": round(return_km, 1)
+    })
 
-    total_km = loaded_km + empty_km
-    loaded_pct = (loaded_km / total_km * 100) if total_km else 0
-    total_miles = total_km * 0.621371
-    rpm = (total_revenue / total_miles) if total_miles else 0
+    total_km = total_loaded_km + total_empty_km
+    loaded_pct = total_loaded_km / total_km if total_km else 0
+    miles = total_km * 0.621371
+    rpm = total_revenue / miles if miles else 0
+    hourly_rate = rpm * 80  # assuming 80 km/h
 
-    driving_hours = total_km / 85 if total_km else 0
-    total_hours = driving_hours + 2 * num_loaded_legs
-    hourly_rate = (total_revenue / total_hours) if total_hours else 0
-
-    summary = {
-        "route_num": route_num,
-        "start": start,
-        "end": end,
-        "loaded_km": round(loaded_km, 1),
-        "empty_km": round(empty_km, 1),
+    return {
+        "loaded_km": round(total_loaded_km, 1),
+        "empty_km": round(total_empty_km, 1),
         "total_km": round(total_km, 1),
-        "loaded_pct": round(loaded_pct, 1),
+        "loaded_pct": round(loaded_pct * 100, 1),
         "total_revenue": round(total_revenue, 2),
         "rpm": round(rpm, 2),
-        "hourly_rate": round(hourly_rate, 2)
-    }
-    return summary, steps
+        "hourly_rate": round(hourly_rate, 2),
+    }, step_breakdown
+
+
 
 
 def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.65, max_chain_amount=6, num_threads=12, task_progress_hook=None):
