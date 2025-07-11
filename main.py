@@ -401,7 +401,7 @@ def dispatch_async():
                     "rate": load["rate"],
                     "weight": load["weight"],
                     "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
-                    "loaded_km": round(DISTANCE_CACHE.get(get_distance_key(pickup, dropoff), 0), 1),
+                    "loaded_km": round(get_loaded_distance_with_routepoints(pickup, load.get("routePoints", []), dropoff), 1),
                     "return_km": DISTANCE_CACHE.get(get_distance_key(dropoff, end_location), 0),
                     "reload_options": reload_options,
                     "required": load.get("required", False),
