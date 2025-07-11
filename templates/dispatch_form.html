@@ -367,14 +367,21 @@ function renderLoadHeaderAndRows(routeDiv, clearRequired = false) {
 
   const loadsContainer = routeDiv.querySelector('.loadsContainer');
   const rows = Array.from(loadsContainer.querySelectorAll('.load-row'));
-  const oldVals = rows.map(row => ({
-    pickup: row.querySelector("input[name='pickup']").value,
-    dropoff: row.querySelector("input[name='dropoff']").value,
-    rate: row.querySelector("input[name='rate']").value,
-    weight: row.querySelector("input[name='weight']").value,
-    required: false,
-    count: row.querySelector("input[name='count']") ? row.querySelector("input[name='count']").value : "1"
-  }));
+  const oldVals = rows.map(row => {
+    const routePoints = Array.from(row.querySelectorAll("input[name='routePoint']"))
+      .map(rp => rp.value.trim())
+      .filter(Boolean);
+
+    return {
+      pickup: row.querySelector("input[name='pickup']").value,
+      dropoff: row.querySelector("input[name='dropoff']").value,
+      rate: row.querySelector("input[name='rate']").value,
+      weight: row.querySelector("input[name='weight']").value,
+      required: row.querySelector("input[name='required']")?.checked || false,
+      count: row.querySelector("input[name='count']")?.value || "1",
+      routePoints
+    };
+  });
   loadsContainer.innerHTML = "";
   oldVals.forEach(vals => addLoadRowWithValues(loadsContainer, vals));
   if (oldVals.length === 0) addLoadRowWithValues(loadsContainer, {});
