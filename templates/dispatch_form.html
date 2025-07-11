@@ -292,42 +292,49 @@ function addLoadRowWithValues(loadsContainer, values) {
   }
 
   row.innerHTML = `
-    <div style="display:flex; flex-direction:column;">
-      <label>Pickup</label>
-      <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
-    </div>
-  
-    <div class="routepoints-container" style="display:flex; flex-direction:column; gap:4px; margin: 0 6px;"></div>
+  <div style="display:flex; flex-direction:column; font-size: 11px;">
+    <label>Pickup</label>
+    <input type="text" name="pickup" placeholder="Pickup City" required value="${values.pickup || ""}" />
+  </div>
 
-    <div style="display:flex; flex-direction:column;">
-      <label>Add</label>
-      <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
-    </div>
+  <div class="routepoints-container" style="display:flex; flex-direction:column; gap:4px; margin: 0 6px;"></div>
 
-    <div style="display:flex; flex-direction:column;">
-      <label>Dropoff</label>
-      <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
-    </div>
+  <div style="display:flex; flex-direction:column; font-size: 11px;">
+    <label>Add</label>
+    <button type="button" class="add-routepoint-btn" onclick="addRoutePoint(this)">➕</button>
+  </div>
 
-    <div style="display:flex; flex-direction:column;">
-      <label>Rate ($/MT)</label>
-      <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
-    </div>
+  <div style="display:flex; flex-direction:column; font-size: 11px;">
+    <label>Dropoff</label>
+    <input type="text" name="dropoff" placeholder="Dropoff City" required value="${values.dropoff || ""}" />
+  </div>
 
-    <div style="display:flex; flex-direction:column;">
-      <label>Weight (MT)</label>
-      <input type="number" name="weight" min="0" step="0.01" value="${values.weight || 43}" required />
-    </div>
+  <div style="display:flex; flex-direction:column; font-size: 11px;">
+    <label>Rate ($/MT)</label>
+    <input type="number" name="rate" placeholder="Rate" value="${values.rate || 0}" min="0" step="0.01" required />
+  </div>
 
-    ${mode === "manual" ? `
-      <div style="display:flex; flex-direction:column;">
-        <label>Required</label>
-        <input type="checkbox" name="required" ${values.required ? "checked" : ""} />
-      </div>
+  <div style="display:flex; flex-direction:column; font-size: 11px;">
+    <label>Weight (MT)</label>
+    <input type="number" name="weight" min="0" step="0.01" value="${values.weight || 43}" required />
+  </div>
+
+  ${mode === "manual" ? `
+    <div style="display:flex; flex-direction:column; font-size: 11px;">
+      <label>Required</label>
+      <input type="checkbox" name="required" ${values.required ? "checked" : ""} />
+    </div>
+  ` : ""}
+
+  <div style="display:flex; align-items:end; gap: 4px;">
+    ${mode === "direct" ? `
+      <button type="button" class="move-up-btn" onclick="moveLoadUp(this)">⬆️</button>
+      <button type="button" class="move-down-btn" onclick="moveLoadDown(this)">⬇️</button>
     ` : ""}
+    <button type="button" onclick="removeLoadRow(this)" style="color: red;">❌</button>
+  </div>
+`;
 
-    <div style="display:flex; flex-direction:column; justify-content:end;">${buttonsHTML}</div>
-  `;  
 
 
   loadsContainer.appendChild(row);
@@ -349,14 +356,15 @@ function removeLoadRow(btn) {
 }
 
 function addRoutePoint(button) {
-  const container = button.parentElement.querySelector(".routepoints-container");
+  const row = button.closest('.load-row');
+  const container = row.querySelector(".routepoints-container");
 
   const wrapper = document.createElement("div");
   wrapper.style = "display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px;";
 
   const label = document.createElement("label");
   label.textContent = `Route Point ${container.children.length + 1}`;
-  label.style = "font-size: 12px;";
+  label.style = "font-size: 11px;";
 
   const input = document.createElement("input");
   input.type = "text";
@@ -369,7 +377,6 @@ function addRoutePoint(button) {
   removeBtn.style = "margin-top: 2px; width: fit-content; align-self: flex-start; color: red;";
   removeBtn.onclick = () => {
     wrapper.remove();
-    // Optional: renumber remaining labels
     const children = container.querySelectorAll("div");
     children.forEach((el, i) => {
       const lbl = el.querySelector("label");
@@ -382,7 +389,6 @@ function addRoutePoint(button) {
   wrapper.appendChild(removeBtn);
   container.appendChild(wrapper);
 }
-
 
 function updateRouteNumbers() {
   const blocks = document.querySelectorAll('.route-block');
