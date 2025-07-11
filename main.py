@@ -216,12 +216,6 @@ def enumerate_qualifying_routes_threaded(enriched_data, loaded_pct_threshold=0.6
                 "step_breakdown": []
             })
 
-        remaining_loaded = sum(l["loaded_km"] for l in loads if l["load_id"] not in used_ids)
-        possible_total = loaded_km + remaining_loaded
-        possible_km = total_km + remaining_loaded
-        if possible_km and (possible_total / possible_km < loaded_pct_threshold):
-            return
-
         remaining_unused = [l for l in loads if l["load_id"] not in used_ids]
         remaining_required = required_ids - set([l["load_id"] for l in path])
         if len(remaining_unused) < len(remaining_required):
@@ -390,6 +384,8 @@ def dispatch_async():
                     "route_points": route_points,
                     "route_cities": route_cities,
                     "final_city": final_city,
+                    "rate": load["rate"],           # ← add this
+                    "weight": load["weight"],       # ← add this
                     "revenue": load["revenue"],
                     "deadhead_km": DISTANCE_CACHE.get(get_distance_key(start_location, pickup), 0),
                     "loaded_km": round(loaded_km, 1),
@@ -433,9 +429,9 @@ def dispatch_async():
                         trip_loads.append({
                             "pickupCity": found["pickup"],
                             "dropoffCity": found["dropoff"],
-                            "rate": found.get("rate", 0),
-                            "weight": found.get("weight", 0),
-                            "routePoints": found.get("route_points", [])
+                            "rate": found["rate"],
+                            "weight": found["weight"],
+                            "revenue": found["revenue"]
                         })
                 trip_route = {
                     "start": enriched_data["start_location"],
