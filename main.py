@@ -1,20 +1,52 @@
 import os
 from flask import Flask, request, jsonify
-from agent_engine import get_agent_runner          # FatCat agent
+from agent_engine import get_agent_runner  # FatCat agent
 
 app = Flask(__name__)
-
-# Initialize agents
 agent = get_agent_runner()
 
-# 🔹 FatCat endpoint
+# 30 quick, punchy crypto-style example replies for inspiration
+crypto_examples = [
+    "Loading the bags 🚀",
+    "Chart looking spicy 🔥",
+    "Only up from here 📈",
+    "Diamond hands ready 💎",
+    "GM fam, bullish vibes 🌞",
+    "Next leg incoming ⚡",
+    "Whales watching closely 👀",
+    "Building through the bear 🏗️",
+    "This is the way 🛡️",
+    "Ready for liftoff 🚀",
+    "Buying the dip like a champ 🏄‍♂️",
+    "Accumulation mode on 🟢",
+    "Liquidity hunting time 🦈",
+    "Sent it to the moon 🌕",
+    "Strong hands, stronger conviction 💪",
+    "Patience pays off 🕰️",
+    "Bag secured, vibes immaculate ✨",
+    "Fresh breakout brewing ☕",
+    "The floor is lava 🧱🔥",
+    "Rockets loaded and fueled 🚀⛽",
+    "Fearless ape season 🦍",
+    "Flip the chart upside down 🤸‍♂️",
+    "No weak hands allowed ❌🤲",
+    "Trend reversal loading 🔄",
+    "Buy pressure heating up ♨️",
+    "Chart art masterpiece 🎨",
+    "Bulls back in town 🐂",
+    "Bear trap set 🪤",
+    "Deep liquidity incoming 💧",
+    "Ocean of green candles 🌊",
+]
+
+# ---------------- FatCat chat endpoint ----------------
 @app.route("/chat", methods=["POST"])
 def chat_fatcat():
     data = request.json
     message = data.get("message", "")
     group_id = data.get("groupId")
     telegram_id = data.get("telegramId")
-    
+
     if not message:
         return jsonify({"error": "Missing message"}), 400
 
@@ -22,7 +54,6 @@ def chat_fatcat():
 [groupId: {group_id}]
 [telegramId: {telegram_id}]
 """
-
     try:
         response = agent.chat(full_message)
         return jsonify({"reply": response.response})
@@ -30,34 +61,41 @@ def chat_fatcat():
         return jsonify({"error": str(e)}), 500
 
 
-# 🔹 Twitter reply generator (uses FatCat LLM)
+# ---------------- Twitter reply generator (crypto style) ----------------
 @app.route("/generate-twitter-reply", methods=["POST"])
 def generate_twitter_reply():
     data = request.json
     group = data.get("groupName")
-    examples = data.get("examples")
+    telegram_id = data.get("telegramId")
 
-    if not group or not examples or not isinstance(examples, list):
-        return jsonify({"error": "Missing or invalid fields: groupName, examples[]"}), 400
+    if not group or not telegram_id:
+        return jsonify({"error": "Missing groupName or telegramId"}), 400
 
-    prompt = f"""You are helping to write a quick Twitter reply about the group "{group}". 
-Here are some examples of the style we're aiming for:
+    # Compose a unique, fresh prompt every call
+    prompt = f"""You are helping to write a quick crypto-style Twitter reply about "{group}".
+Session id: {os.urandom(4).hex()}  # to help force uniqueness
 
-{chr(10).join([f'{i+1}. "{ex}"' for i, ex in enumerate(examples)])}
+Here are sample vibes:
 
-Now, based on the examples above, write **one** short, friendly, punchy Twitter reply about "{group}". 
-Keep it under 100 characters. 
-Do not add hashtags unless it naturally fits.
-Reply as if you're a real person who loves the group. Only output the reply text, nothing else."""
+{chr(10).join([f'{i+1}. \"{ex}\"' for i, ex in enumerate(crypto_examples)])}
 
+Now write **one** short, punchy, crypto-savvy reply about "{group}".
+Rules:
+- Keep under 100 characters.
+- No hashtags unless natural.
+- Make it feel like a genuine degen tweet.
+- It **must** be fresh and different every time, even for similar input.
+Output only the reply text.
+"""
     try:
         response = agent.chat(prompt)
-        return jsonify({ "reply": response.response.strip() })
+        return jsonify({"reply": response.response.strip()})
     except Exception as e:
         print("❌ Error generating reply:", e)
         return jsonify({"error": "Failed to generate Twitter reply"}), 500
 
-# 🔹 Start the Flask server
+
+# ---------------- Start the Flask server ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
